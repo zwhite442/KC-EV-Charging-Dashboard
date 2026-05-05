@@ -130,7 +130,7 @@
             <div class="detail-value" id="detail-color">—</div>
           </div>
           <div class="detail-cell">
-            <div class="detail-label">Mileage</div>
+            <div class="detail-label">Spot</div>
             <div class="detail-value" id="detail-mileage">—</div>
           </div>
           <div class="detail-cell">
@@ -161,84 +161,90 @@
     <!-- Add vehicle form panel -->
     <section class="panel-form" id="panel-form">
       <div class="form-scroll">
-        <h2 class="form-heading">Add a vehicle to the lot</h2>
+        <h2 class="form-heading">Add vehicles to the lot</h2>
 
-        <div class="upload-row">
-          <label class="upload-btn">
-            📂 Upload Excel / CSV
-            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" />
-          </label>
-          <button class="sample-btn" id="sample-btn">Load sample fleet</button>
-        </div>
-
-        <div class="field-grid">
-          <div class="field field--full">
-            <label for="f-vin">VIN <span class="field-hint">(auto-fills make)</span></label>
-            <input type="text" id="f-vin" placeholder="17-character VIN" maxlength="17" autocomplete="off" />
+        <!-- ── METHOD 1: Paste from Excel ── -->
+        <div class="method-card" id="method-paste">
+          <div class="method-header">
+            <span class="method-icon">📋</span>
+            <div>
+              <div class="method-title">Paste from Excel</div>
+              <div class="method-sub">Copy your rows in Excel (Cmd/Ctrl+C) then paste below</div>
+            </div>
           </div>
-          <div class="field">
-            <label for="f-make">Make</label>
-            <input type="text" id="f-make" placeholder="Chevrolet" value="Chevrolet" />
-          </div>
-          <div class="field">
-            <label for="f-model">Model</label>
-            <input type="text" id="f-model" placeholder="Bolt EUV" value="Bolt EUV" />
-          </div>
-          <div class="field">
-            <label for="f-year">Year</label>
-            <input type="number" id="f-year" placeholder="2027" value="2027" min="1990" max="2035" />
-          </div>
-          <div class="field">
-            <label for="f-mileage">Mileage</label>
-            <input type="number" id="f-mileage" placeholder="0" min="0" />
-          </div>
-          <div class="field field--full">
-            <label for="f-color">Color</label>
-            <select id="f-color">
-              <option value="red" selected>Radiant Red</option>
-              <option value="black">Mosaic Black</option>
-              <option value="white">Summit White</option>
-              <option value="silver">Sterling Gray</option>
-              <option value="blue">Riptide Blue</option>
-              <option value="gray">Gray</option>
-              <option value="midnight">Midnight Blue</option>
-              <option value="green">Cacti Green</option>
-            </select>
+          <textarea
+            id="paste-input"
+            class="paste-area"
+            placeholder="Select all rows from your daily date tab in Excel, copy (Cmd+C / Ctrl+C), then paste here.&#10;&#10;Reads your columns automatically:  VIN · Location · Vehicle · Battery Pack · Starting SOC · Ending SOC&#10;Skips empty rows and FILL IN SOC warnings automatically."
+            spellcheck="false"
+          ></textarea>
+          <div class="paste-actions">
+            <div class="paste-preview" id="paste-preview"></div>
+            <button class="paste-btn" id="paste-btn">Import pasted data →</button>
           </div>
         </div>
 
-        <div class="section-label">Charging data</div>
-        <div class="charge-grid">
-          <div class="field">
-            <label for="f-start">Start %</label>
-            <input type="number" id="f-start" placeholder="20" min="0" max="100" />
+        <!-- ── METHOD 2: Upload Excel file ── -->
+        <div class="method-card">
+          <div class="method-header">
+            <span class="method-icon">📂</span>
+            <div>
+              <div class="method-title">Upload Excel file</div>
+              <div class="method-sub">Auto-loads today's sheet (<span id="today-sheet-label"></span>)</div>
+            </div>
           </div>
-          <div class="field">
-            <label for="f-end">Target %</label>
-            <input type="number" id="f-end" placeholder="90" min="0" max="100" />
-          </div>
-          <div class="field">
-            <label for="f-rate">Rate (kW/h)</label>
-            <input type="number" id="f-rate" placeholder="11" min="1" max="350" />
-          </div>
-          <div class="field field--computed">
-            <label>kWh Delivered <span class="field-hint">(auto-calculated)</span></label>
-            <div class="computed-value" id="f-kwh-display">—</div>
+          <div class="upload-row">
+            <label class="upload-btn">
+              Choose Excel / CSV file
+              <input type="file" id="file-input" accept=".xlsx,.xls,.csv" />
+            </label>
+            <button class="sample-btn" id="sample-btn">Load sample fleet</button>
           </div>
         </div>
 
-        <!-- Live preview bar -->
-        <div class="preview-box">
-          <div class="preview-row">
-            <span>Charge preview</span>
-            <span id="preview-pct">—</span>
+        <!-- ── METHOD 3: Manual single entry ── -->
+        <div class="method-card">
+          <div class="method-header">
+            <span class="method-icon">✏️</span>
+            <div>
+              <div class="method-title">Add single vehicle</div>
+              <div class="method-sub">Color is assigned automatically · Make/model always Chevrolet Bolt EUV</div>
+            </div>
           </div>
-          <div class="preview-track">
-            <div class="preview-fill" id="preview-bar"></div>
+          <div class="field-grid">
+            <div class="field field--full">
+              <label for="f-vin">VIN</label>
+              <input type="text" id="f-vin" placeholder="17-character VIN" maxlength="17" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="f-location">Parking Spot</label>
+              <input type="text" id="f-location" placeholder="e.g. 1T-24" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="f-start">Starting SOC %</label>
+              <input type="number" id="f-start" placeholder="24" min="0" max="100" />
+            </div>
+            <div class="field">
+              <label for="f-end">Ending SOC %</label>
+              <input type="number" id="f-end" placeholder="30" min="0" max="100" />
+            </div>
+            <div class="field field--computed">
+              <label>kWh Delivered <span class="field-hint">(auto)</span></label>
+              <div class="computed-value" id="f-kwh-display">—</div>
+            </div>
           </div>
+          <!-- Live preview bar -->
+          <div class="preview-box">
+            <div class="preview-row">
+              <span>Charge preview</span>
+              <span id="preview-pct">—</span>
+            </div>
+            <div class="preview-track">
+              <div class="preview-fill" id="preview-bar"></div>
+            </div>
+          </div>
+          <button class="add-btn" id="add-btn">Add to lot →</button>
         </div>
-
-        <button class="add-btn" id="add-btn">Add to lot →</button>
 
         <div class="entries-header">
           <span>Fleet this month (<span id="entry-count">0</span>)</span>

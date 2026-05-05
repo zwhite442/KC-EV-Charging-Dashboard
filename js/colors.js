@@ -104,10 +104,18 @@ window.EV_COLORS.getStatusColor = function(startPct) {
  */
 window.EV_COLORS.BOLT_BATTERY_KWH = 65;
 
-window.EV_COLORS.calcKwh = function(startPct, endPct, batteryKwh) {
-  const cap = batteryKwh || window.EV_COLORS.BOLT_BATTERY_KWH;
-  const delta = Math.max(0, endPct - startPct);
-  return Math.round((delta / 100) * cap * 10) / 10; // one decimal place
+/**
+ * calcKwh(startPct, endPct, batteryPackMultiplier)
+ * batteryPackMultiplier = the value from column D in your sheet (e.g. 0.66)
+ * Actual usable capacity = 65 kWh × batteryPackMultiplier
+ * If no multiplier provided, defaults to 0.66 (typical Bolt EUV pack health)
+ */
+window.EV_COLORS.calcKwh = function(startPct, endPct, batteryPackMultiplier) {
+  const pack     = (batteryPackMultiplier && batteryPackMultiplier > 0 && batteryPackMultiplier <= 1)
+                   ? batteryPackMultiplier : 0.66;
+  const capacity = window.EV_COLORS.BOLT_BATTERY_KWH * pack;
+  const delta    = Math.max(0, endPct - startPct);
+  return Math.round((delta / 100) * capacity * 10) / 10;
 };
 
 // VIN prefix → make lookup (top 30 EV brands + common)

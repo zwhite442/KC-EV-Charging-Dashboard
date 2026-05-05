@@ -110,7 +110,7 @@
     card.innerHTML = `
       <div class="vc-row">
         <div class="vc-swatch" style="background:${pal.body}"></div>
-        <div class="vc-name">${v.year} ${v.make} ${v.model}</div>
+        <div class="vc-name">${v.location ? v.location + ' · ' : ''}${v.make} ${v.model}</div>
       </div>
       <div class="vc-vin">${v.vin}</div>
       <div class="vc-bar-track">
@@ -168,7 +168,7 @@
         <div class="entry-swatch" style="background:${pal.body}"></div>
         <div class="entry-info">
           <div class="entry-name">${v.year} ${v.make} ${v.model}</div>
-          <div class="entry-sub">${v.vin} &nbsp;·&nbsp; ${Math.round(v.startPct)}% → ${Math.round(v.endPct)}% &nbsp;·&nbsp; ${v.kwh} kWh</div>
+          <div class="entry-sub">${v.location ? v.location + ' &nbsp;·&nbsp; ' : ''}${v.vin} &nbsp;·&nbsp; ${Math.round(v.startPct)}%→${Math.round(v.endPct)}% &nbsp;·&nbsp; ${v.kwh} kWh</div>
         </div>
         <button class="entry-del" aria-label="Remove vehicle">✕</button>
       `;
@@ -187,12 +187,16 @@
     const label   = palette.label || v.color;
 
     document.getElementById('detail-title').textContent   = `${v.year} ${v.make} ${v.model}`;
-    document.getElementById('detail-vin').textContent     = v.vin    || '—';
-    document.getElementById('detail-year').textContent    = v.year   || '—';
+    document.getElementById('detail-vin').textContent     = v.vin      || '—';
+    document.getElementById('detail-year').textContent    = v.year     || '—';
     document.getElementById('detail-color').textContent   = label;
-    document.getElementById('detail-mileage').textContent = v.mileage ? Number(v.mileage).toLocaleString() + ' mi' : '—';
+    document.getElementById('detail-mileage').textContent = v.location || '—';
     document.getElementById('detail-rate').textContent    = v.rate   ? v.rate + ' kW/h' : '—';
-    document.getElementById('detail-kwh').textContent     = v.kwh !== undefined ? v.kwh + ' kWh (auto)' : '—';
+    const packPct = v.batteryPack ? Math.round(v.batteryPack * 100) + '%' : '66%';
+    const capacity = v.batteryPack ? Math.round(65 * v.batteryPack * 10) / 10 : 42.9;
+    document.getElementById('detail-kwh').textContent     = v.kwh !== undefined
+      ? `${v.kwh} kWh (${capacity} kWh cap · pack ${packPct})`
+      : '—';
 
     const s  = Math.round(v.startPct);
     const en = Math.round(v.endPct);
@@ -245,12 +249,12 @@
     const e  = parseFloat(document.getElementById('f-end').value)   || 0;
     const sc = s >= 30 ? '#818cf8' : s < 10 ? '#ef4444' : '#22c55e';
 
-    document.getElementById('preview-bar').style.width      = Math.min(100, Math.max(0, s)) + '%';
-    document.getElementById('preview-bar').style.background = sc;
-    document.getElementById('preview-pct').textContent      = Math.round(s) + '% → ' + Math.round(e) + '%';
+    const bar = document.getElementById('preview-bar');
+    const pct = document.getElementById('preview-pct');
+    if (bar) { bar.style.width = Math.min(100, Math.max(0, s)) + '%'; bar.style.background = sc; }
+    if (pct) pct.textContent = Math.round(s) + '% → ' + Math.round(e) + '%';
 
-    // Show auto-calculated kWh in the computed field
-    const kwh = window.EV_COLORS.calcKwh(s, e);
+    const kwh     = window.EV_COLORS.calcKwh(s, e);
     const display = document.getElementById('f-kwh-display');
     if (display) display.textContent = (s || e) ? kwh + ' kWh' : '—';
   }
