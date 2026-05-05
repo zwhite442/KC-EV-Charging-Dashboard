@@ -1,0 +1,110 @@
+/* ── Vehicle detail card (canvas overlay) ── */
+.detail-card {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  max-width: 400px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  z-index: 10;
+  display: none;
+  backdrop-filter: blur(8px);
+}
+.detail-card.visible { display: block; }
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.detail-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.detail-close {
+  cursor: pointer;
+  color: var(--text-hint);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  transition: color .1s;
+}
+.detail-close:hover { color: var(--text-primary); }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.detail-cell {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+.detail-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.detail-value {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-value--mono {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .3px;
+}
+
+/* ── Charge progress in detail ── */
+.detail-charge { }
+.charge-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+.charge-label { color: var(--text-secondary); }
+.charge-pct { font-weight: 600; color: var(--text-primary); }
+.charge-track {
+  height: 5px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.charge-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .5s;
+}
+.charge-bounds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-hint);
+}
+
+/* ── Responsive tweaks ── */
+@media (max-width: 600px) {
+  .topbar { padding: 8px 10px; }
+  .topbar-right { display: none; }
+  .sidebar { width: 160px; }
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+  .main { height: calc(100vh - 88px); }
+}
