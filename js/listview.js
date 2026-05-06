@@ -241,3 +241,46 @@
   // ── Public API ────────────────────────────────────────────────────────────────
   window.listView = { refresh, buildList, buildTooltips, bindEvents };
 })();
+
+// ── Tooltip hover logic (JS-based for cross-browser reliability) ────────────
+(function initTooltips() {
+  const pills = [
+    { triggerId: 'pill-kwh',   tooltipId: 'tooltip-kwh'   },
+    { triggerId: 'pill-avg',   tooltipId: 'tooltip-avg'   },
+    { triggerId: 'pill-start', tooltipId: 'tooltip-start' },
+  ];
+
+  function positionTooltip(trigger, tooltip) {
+    const r  = trigger.getBoundingClientRect();
+    const tw = 260;
+    let left = r.right - tw;
+    if (left < 8) left = 8;
+    const top = r.bottom + 8;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    pills.forEach(({ triggerId, tooltipId }) => {
+      const trigger = document.getElementById(triggerId);
+      const tooltip = document.getElementById(tooltipId);
+      if (!trigger || !tooltip) return;
+
+      trigger.addEventListener('mouseenter', () => {
+        positionTooltip(trigger, tooltip);
+        tooltip.classList.add('visible');
+      });
+      trigger.addEventListener('mouseleave', e => {
+        // Small delay so cursor can move into tooltip
+        setTimeout(() => {
+          if (!tooltip.matches(':hover') && !trigger.matches(':hover')) {
+            tooltip.classList.remove('visible');
+          }
+        }, 80);
+      });
+      tooltip.addEventListener('mouseleave', () => {
+        tooltip.classList.remove('visible');
+      });
+    });
+  });
+})();

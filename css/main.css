@@ -425,8 +425,7 @@ html, body {
 }
 .stat-pill--highlight strong { color: var(--accent); }
 
-/* ── Pan hint in rotation bar ── */
-.rot-label::after { content: ' · Shift+drag to pan'; }
+/* ── Mode toggle button ── */
 
 /* ── List View panel ── */
 .panel-list {
@@ -597,22 +596,21 @@ html, body {
 }
 
 /* ── Stat pill tooltips ── */
-.tooltip-trigger { position: relative; }
+.tooltip-trigger { position: relative; cursor: default; }
 .stat-tooltip {
   display: none;
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  position: fixed;
   background: var(--bg-surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   padding: 10px;
-  min-width: 200px;
-  max-width: 260px;
-  z-index: 200;
-  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  min-width: 220px;
+  max-width: 280px;
+  z-index: 9999;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55);
+  pointer-events: none;
 }
-.tooltip-trigger:hover .stat-tooltip { display: block; }
+.stat-tooltip.visible { display: block; }
 .tt-header {
   font-size: 10px;
   font-weight: 600;
@@ -640,3 +638,23 @@ html, body {
 .tt-row:last-child { border-bottom: none; }
 .tt-loc { color: var(--accent); font-weight: 500; }
 .tt-val { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.mode-toggle {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 20px;
+  color: #aabbcc;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap;
+}
+.mode-toggle:hover { background: rgba(255,255,255,.14); color: #fff; }
+.mode-toggle--active {
+  background: rgba(56,139,253,.25);
+  border-color: rgba(56,139,253,.5);
+  color: #6ab0ff;
+}

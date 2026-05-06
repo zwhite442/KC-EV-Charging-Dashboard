@@ -12,19 +12,28 @@
   // ── Tab switching ─────────────────────────────────────────────────────────────
   function switchTab(tab) {
     activeTab = tab;
-    // Safe toggle — only touch elements that actually exist in the DOM
-    const safe = (id, active) => {
+
+    // Toggle tab button active states
+    ['tab-3d','tab-add','tab-list','tab-totals'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.classList.toggle('active', active);
+      if (el) el.classList.toggle('active', id === 'tab-' + tab);
+    });
+
+    // Show/hide panels — use both class AND inline style for reliability
+    const panels = {
+      '3d':     'panel-3d',
+      'add':    'panel-form',
+      'list':   'panel-list',
+      'totals': 'panel-totals',
     };
-    safe('tab-3d',      tab === '3d');
-    safe('tab-add',     tab === 'add');
-    safe('tab-list',    tab === 'list');
-    safe('tab-totals',  tab === 'totals');
-    safe('panel-3d',    tab === '3d');
-    safe('panel-form',  tab === 'add');
-    safe('panel-list',  tab === 'list');
-    safe('panel-totals',tab === 'totals');
+    Object.entries(panels).forEach(([t, panelId]) => {
+      const el = document.getElementById(panelId);
+      if (!el) return;
+      const isActive = t === tab;
+      el.classList.toggle('active', isActive);
+      el.style.display = isActive ? (t === '3d' ? 'flex' : 'flex') : 'none';
+    });
+
     if (tab === '3d' && window.renderer) window.renderer.resize();
   }
 

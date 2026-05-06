@@ -41,21 +41,21 @@
       <div class="stat-divider"></div>
       <div class="stat-pill stat-pill--highlight tooltip-trigger" id="pill-kwh">
         ⚡ <strong id="stat-total-kwh">0</strong> kWh
-        <div class="stat-tooltip" id="tooltip-kwh">
+        <div class="stat-tooltip" id="tooltip-kwh" style="display:none">
           <div class="tt-header">kWh Delivered per Vehicle</div>
           <div class="tt-list" id="tt-kwh-list"></div>
         </div>
       </div>
       <div class="stat-pill tooltip-trigger" id="pill-avg">
         ⌀ <strong id="stat-avg-kwh">—</strong> kWh/car
-        <div class="stat-tooltip" id="tooltip-avg">
+        <div class="stat-tooltip" id="tooltip-avg" style="display:none">
           <div class="tt-header">kWh per Vehicle (sorted high→low)</div>
           <div class="tt-list" id="tt-avg-list"></div>
         </div>
       </div>
       <div class="stat-pill tooltip-trigger" id="pill-start">
         📍 Avg Start <strong id="stat-avg-start">—</strong>%
-        <div class="stat-tooltip" id="tooltip-start">
+        <div class="stat-tooltip" id="tooltip-start" style="display:none">
           <div class="tt-header">Starting SOC per Vehicle</div>
           <div class="tt-list" id="tt-start-list"></div>
         </div>
@@ -121,7 +121,7 @@
       <!-- Rotation controls -->
       <div class="rot-bar" id="rot-bar">
         <button class="rot-btn" id="rot-left" aria-label="Rotate left">&#9664;</button>
-        <span class="rot-label">drag or tap to rotate</span>
+        <button class="mode-toggle" id="mode-toggle" title="Toggle rotate / pan mode">🔄 Rotate</button>
         <button class="rot-btn" id="rot-right" aria-label="Rotate right">&#9654;</button>
       </div>
 
@@ -277,7 +277,7 @@
     </section>
 
     <!-- List View panel -->
-    <section class="panel-list" id="panel-list">
+    <section class="panel-list" id="panel-list" style="display:none">
       <div class="list-toolbar">
         <input type="search" id="list-search" placeholder="Search VIN, spot, color…" class="list-search-input" />
         <span class="list-count" id="list-count">0 vehicles</span>
