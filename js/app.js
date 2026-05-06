@@ -117,40 +117,45 @@
   }
 
   // ── Event bindings ────────────────────────────────────────────────────────────
+  // Safe binder — skips silently if element missing so one bad ID can't block the rest
+  function on(id, evt, fn) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(evt, fn);
+    else console.warn('EV Lot: element not found:', id);
+  }
+
   function bindEvents() {
-    document.getElementById('tab-3d').addEventListener('click',  () => switchTab('3d'));
-    document.getElementById('tab-add').addEventListener('click', () => switchTab('add'));
+    on('tab-3d',     'click', () => switchTab('3d'));
+    on('tab-add',    'click', () => switchTab('add'));
+    on('tab-totals', 'click', () => switchTab('totals'));
 
     // Paste
-    document.getElementById('paste-btn').addEventListener('click', handlePaste);
-    document.getElementById('paste-input').addEventListener('input', onPasteInput);
-    // Also handle Ctrl+Enter / Cmd+Enter in paste box
-    document.getElementById('paste-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePaste();
-    });
+    on('paste-btn',   'click',   handlePaste);
+    on('paste-input', 'input',   onPasteInput);
+    on('paste-input', 'keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePaste(); });
 
     // Excel upload
-    document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+    on('file-input', 'change', e => handleFile(e.target.files[0]));
 
-    // Sample
-    document.getElementById('sample-btn').addEventListener('click', () => {
+    // Sample fleet
+    on('sample-btn', 'click', () => {
       window.store.addVehicles(window.store.getSampleFleet(10)).then(() => switchTab('3d'));
     });
 
-    // Manual add
-    document.getElementById('add-btn').addEventListener('click', addVehicle);
+    // Manual add — the main fix
+    on('add-btn', 'click', addVehicle);
 
-    // Preview inputs
-    document.getElementById('f-start').addEventListener('input', updatePreview);
-    document.getElementById('f-end').addEventListener('input',   updatePreview);
+    // Charge preview
+    on('f-start', 'input', updatePreview);
+    on('f-end',   'input', updatePreview);
 
-    // Enter in manual fields
+    // Enter key submits manual form
     ['f-vin','f-location','f-start','f-end'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addVehicle(); });
+      on(id, 'keydown', e => { if (e.key === 'Enter') addVehicle(); });
     });
 
     // Clear lot
-    document.getElementById('clear-btn').addEventListener('click', () => {
+    on('clear-btn', 'click', () => {
       if (!window.store.getVehicles().length) return;
       if (confirm('Clear all vehicles from the lot?')) {
         window.store.clearAll();
