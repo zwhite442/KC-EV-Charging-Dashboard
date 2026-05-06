@@ -18,20 +18,38 @@
   let filterQuery   = '';
 
   // ── Stat pills ────────────────────────────────────────────────────────────────
+  // All values auto-calculated from vehicle data — no manual input needed
   function updateStats(vehicles) {
     let ready = 0, charging = 0, critical = 0;
+    let totalKwh = 0, totalStart = 0, count = vehicles.length;
+
     vehicles.forEach(v => {
-      const s = window.EV_COLORS.getStatusColor(v.startPct, v.endPct); // uses endPct for ready threshold
-      if      (s === '#818cf8') ready++;
-      else if (s === '#ef4444') critical++;
-      else    charging++;
+      // Status based on endPct (charged/target state)
+      if (v.endPct >= 30)      ready++;
+      else if (v.endPct < 10)  critical++;
+      else                     charging++;
+
+      // Auto-accumulate kWh and starting SOC
+      const pack = v.batteryPack || 0.66;
+      const kwh  = window.EV_COLORS.calcKwh(v.startPct, v.endPct, pack);
+      totalKwh  += kwh;
+      totalStart += (v.startPct || 0);
     });
-    document.getElementById('stat-charging').textContent = charging;
-    document.getElementById('stat-full').textContent     = ready;
-    document.getElementById('stat-low').textContent      = critical;
-    document.getElementById('stat-total').textContent    = vehicles.length;
-    document.getElementById('vehicle-count').textContent = vehicles.length;
-    document.getElementById('entry-count').textContent   = vehicles.length;
+
+    const avgKwh  = count > 0 ? Math.round((totalKwh / count) * 10) / 10 : 0;
+    const avgStart = count > 0 ? Math.round((totalStart / count) * 100) / 100 : 0;
+    const totalKwhRounded = Math.round(totalKwh * 10) / 10;
+
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('stat-charging',  charging);
+    set('stat-full',      ready);
+    set('stat-low',       critical);
+    set('stat-total',     count);
+    set('vehicle-count',  count);
+    set('entry-count',    count);
+    set('stat-total-kwh', totalKwhRounded);
+    set('stat-avg-kwh',   count > 0 ? avgKwh : '—');
+    set('stat-avg-start', count > 0 ? avgStart : '—');
   }
 
   // ── Search filtering ──────────────────────────────────────────────────────────

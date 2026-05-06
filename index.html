@@ -39,26 +39,14 @@
         <span class="dot dot--gray"></span>Total <strong id="stat-total">0</strong>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-pill stat-pill--highlight tooltip-trigger" id="pill-kwh">
+      <div class="stat-pill stat-pill--highlight" id="pill-kwh">
         ⚡ <strong id="stat-total-kwh">0</strong> kWh
-        <div class="stat-tooltip" id="tooltip-kwh" style="display:none">
-          <div class="tt-header">kWh Delivered per Vehicle</div>
-          <div class="tt-list" id="tt-kwh-list"></div>
-        </div>
       </div>
-      <div class="stat-pill tooltip-trigger" id="pill-avg">
+      <div class="stat-pill" id="pill-avg">
         ⌀ <strong id="stat-avg-kwh">—</strong> kWh/car
-        <div class="stat-tooltip" id="tooltip-avg" style="display:none">
-          <div class="tt-header">kWh per Vehicle (sorted high→low)</div>
-          <div class="tt-list" id="tt-avg-list"></div>
-        </div>
       </div>
-      <div class="stat-pill tooltip-trigger" id="pill-start">
+      <div class="stat-pill" id="pill-start">
         📍 Avg Start <strong id="stat-avg-start">—</strong>%
-        <div class="stat-tooltip" id="tooltip-start" style="display:none">
-          <div class="tt-header">Starting SOC per Vehicle</div>
-          <div class="tt-list" id="tt-start-list"></div>
-        </div>
       </div>
     </div>
   </header>
@@ -403,6 +391,20 @@
     </section>
 
   </div><!-- /main -->
+
+  <!-- Stat tooltips — rendered at body level to avoid overflow clipping -->
+  <div class="stat-tooltip" id="tooltip-kwh">
+    <div class="tt-header">⚡ kWh Delivered per Vehicle</div>
+    <div class="tt-list" id="tt-kwh-list"></div>
+  </div>
+  <div class="stat-tooltip" id="tooltip-avg">
+    <div class="tt-header">⌀ kWh per Vehicle (high → low)</div>
+    <div class="tt-list" id="tt-avg-list"></div>
+  </div>
+  <div class="stat-tooltip" id="tooltip-start">
+    <div class="tt-header">📍 Starting SOC per Vehicle</div>
+    <div class="tt-list" id="tt-start-list"></div>
+  </div>
 
   <!-- Context menu for list view -->
   <div class="ctx-menu" id="ctx-menu" style="display:none">

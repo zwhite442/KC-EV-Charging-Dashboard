@@ -160,28 +160,61 @@
     closeEditModal();
   }
 
-  // ── Hover tooltips ────────────────────────────────────────────────────────────
+  // ── Hover tooltips — auto-calculated from vehicle data ───────────────────────
   function buildTooltips(vehicles) {
-    // kWh list — sorted high to low
-    const kwhList = document.getElementById('tt-kwh-list');
-    const avgList = document.getElementById('tt-avg-list');
+    const kwhList   = document.getElementById('tt-kwh-list');
+    const avgList   = document.getElementById('tt-avg-list');
     const startList = document.getElementById('tt-start-list');
-    if (!kwhList || !avgList || !startList) return;
+    if (!kwhList || !avgList || !startList || !vehicles.length) return;
 
-    const sorted = [...vehicles].sort((a,b) => (b.kwh||0) - (a.kwh||0));
+    // Calculate kWh for each vehicle on the fly (always up to date)
+    const withKwh = vehicles.map(v => ({
+      loc:   v.location || '?',
+      kwh:   window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack || 0.66),
+      start: Math.round(v.startPct || 0),
+    }));
 
-    kwhList.innerHTML = sorted.map(v =>
-      `<div class="tt-row"><span class="tt-loc">${v.location||'?'}</span><span class="tt-val">${v.kwh||0} kWh</span></div>`
-    ).join('');
+    // kWh tooltip — sorted high to low
+    const byKwh = [...withKwh].sort((a,b) => b.kwh - a.kwh);
+    const totalKwh = byKwh.reduce((s,v) => s + v.kwh, 0);
+    kwhList.innerHTML = byKwh.map(v =>
+      `<div class="tt-row">
+        <span class="tt-loc">${v.loc}</span>
+        <span class="tt-val">${v.kwh} kWh</span>
+      </div>`
+    ).join('') +
+    `<div class="tt-row tt-total">
+      <span class="tt-loc">Total</span>
+      <span class="tt-val">${Math.round(totalKwh * 10)/10} kWh</span>
+    </div>`;
 
-    avgList.innerHTML = sorted.map(v =>
-      `<div class="tt-row"><span class="tt-loc">${v.location||'?'}</span><span class="tt-val">${v.kwh||0} kWh</span></div>`
-    ).join('');
+    // Avg kWh/car tooltip — same data, shows average at bottom
+    const avg = vehicles.length > 0 ? Math.round((totalKwh / vehicles.length) * 10) / 10 : 0;
+    avgList.innerHTML = byKwh.map(v =>
+      `<div class="tt-row">
+        <span class="tt-loc">${v.loc}</span>
+        <span class="tt-val">${v.kwh} kWh</span>
+      </div>`
+    ).join('') +
+    `<div class="tt-row tt-total">
+      <span class="tt-loc">Average</span>
+      <span class="tt-val">${avg} kWh/car</span>
+    </div>`;
 
-    const sortedStart = [...vehicles].sort((a,b) => (a.startPct||0) - (b.startPct||0));
-    startList.innerHTML = sortedStart.map(v =>
-      `<div class="tt-row"><span class="tt-loc">${v.location||'?'}</span><span class="tt-val">${Math.round(v.startPct||0)}%</span></div>`
-    ).join('');
+    // Starting SOC tooltip — sorted lowest first (most critical at top)
+    const byStart = [...withKwh].sort((a,b) => a.start - b.start);
+    const avgStart = vehicles.length > 0
+      ? Math.round(byStart.reduce((s,v) => s + v.start, 0) / vehicles.length * 100) / 100 : 0;
+    startList.innerHTML = byStart.map(v =>
+      `<div class="tt-row">
+        <span class="tt-loc">${v.loc}</span>
+        <span class="tt-val">${v.start}%</span>
+      </div>`
+    ).join('') +
+    `<div class="tt-row tt-total">
+      <span class="tt-loc">Average</span>
+      <span class="tt-val">${avgStart}%</span>
+    </div>`;
   }
 
   // ── Refresh (called on every store change) ────────────────────────────────────
@@ -242,45 +275,67 @@
   window.listView = { refresh, buildList, buildTooltips, bindEvents };
 })();
 
-// ── Tooltip hover logic (JS-based for cross-browser reliability) ────────────
+// ── Tooltip hover logic ──────────────────────────────────────────────────────
+// Tooltips live at body level to avoid any overflow/clip issues.
+// Triggered by mouseenter/leave on the stat pills.
 (function initTooltips() {
-  const pills = [
+  const PAIRS = [
     { triggerId: 'pill-kwh',   tooltipId: 'tooltip-kwh'   },
     { triggerId: 'pill-avg',   tooltipId: 'tooltip-avg'   },
     { triggerId: 'pill-start', tooltipId: 'tooltip-start' },
   ];
 
-  function positionTooltip(trigger, tooltip) {
-    const r  = trigger.getBoundingClientRect();
-    const tw = 260;
-    let left = r.right - tw;
+  let activeTooltip = null;
+
+  function show(trigger, tooltip) {
+    // Hide any other open tooltip first
+    if (activeTooltip && activeTooltip !== tooltip) {
+      activeTooltip.classList.remove('visible');
+    }
+    const r   = trigger.getBoundingClientRect();
+    const tw  = 260;
+    let   left = r.right - tw;
     if (left < 8) left = 8;
-    const top = r.bottom + 8;
+    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
     tooltip.style.left = left + 'px';
-    tooltip.style.top  = top  + 'px';
+    tooltip.style.top  = (r.bottom + 6) + 'px';
+    tooltip.classList.add('visible');
+    activeTooltip = tooltip;
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    pills.forEach(({ triggerId, tooltipId }) => {
+  function hide(tooltip) {
+    tooltip.classList.remove('visible');
+    if (activeTooltip === tooltip) activeTooltip = null;
+  }
+
+  function wire() {
+    PAIRS.forEach(({ triggerId, tooltipId }) => {
       const trigger = document.getElementById(triggerId);
       const tooltip = document.getElementById(tooltipId);
       if (!trigger || !tooltip) return;
 
-      trigger.addEventListener('mouseenter', () => {
-        positionTooltip(trigger, tooltip);
-        tooltip.classList.add('visible');
-      });
-      trigger.addEventListener('mouseleave', e => {
-        // Small delay so cursor can move into tooltip
+      trigger.addEventListener('mouseenter', () => show(trigger, tooltip));
+      trigger.addEventListener('mouseleave', () => {
         setTimeout(() => {
-          if (!tooltip.matches(':hover') && !trigger.matches(':hover')) {
-            tooltip.classList.remove('visible');
-          }
-        }, 80);
+          if (!tooltip.matches(':hover')) hide(tooltip);
+        }, 120);
       });
-      tooltip.addEventListener('mouseleave', () => {
-        tooltip.classList.remove('visible');
-      });
+      tooltip.addEventListener('mouseleave', () => hide(tooltip));
     });
-  });
+
+    // Close all tooltips on click anywhere
+    document.addEventListener('click', () => {
+      PAIRS.forEach(({ tooltipId }) => {
+        const t = document.getElementById(tooltipId);
+        if (t) t.classList.remove('visible');
+      });
+      activeTooltip = null;
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();

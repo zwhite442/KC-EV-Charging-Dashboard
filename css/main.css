@@ -658,3 +658,16 @@ html, body {
   border-color: rgba(56,139,253,.5);
   color: #6ab0ff;
 }
+
+/* ── Tooltip total/average row ── */
+.tt-total {
+  border-top: 1px solid var(--border-strong) !important;
+  margin-top: 2px;
+  font-weight: 600;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
+  padding-top: 4px !important;
+}
+.tt-total .tt-loc { color: var(--text-secondary); }
+.tt-total .tt-val { color: var(--text-primary); }
