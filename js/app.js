@@ -12,12 +12,17 @@
   // ── Tab switching ─────────────────────────────────────────────────────────────
   function switchTab(tab) {
     activeTab = tab;
-    document.getElementById('tab-3d').classList.toggle('active',     tab === '3d');
-    document.getElementById('tab-add').classList.toggle('active',    tab === 'add');
-    document.getElementById('tab-totals').classList.toggle('active', tab === 'totals');
-    document.getElementById('panel-3d').classList.toggle('active',     tab === '3d');
-    document.getElementById('panel-form').classList.toggle('active',   tab === 'add');
-    document.getElementById('panel-totals').classList.toggle('active', tab === 'totals');
+    // Safe toggle — only touch elements that actually exist in the DOM
+    const safe = (id, active) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('active', active);
+    };
+    safe('tab-3d',      tab === '3d');
+    safe('tab-add',     tab === 'add');
+    safe('tab-totals',  tab === 'totals');
+    safe('panel-3d',    tab === '3d');
+    safe('panel-form',  tab === 'add');
+    safe('panel-totals',tab === 'totals');
     if (tab === '3d' && window.renderer) window.renderer.resize();
   }
 
