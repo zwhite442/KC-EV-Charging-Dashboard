@@ -19,9 +19,11 @@
     };
     safe('tab-3d',      tab === '3d');
     safe('tab-add',     tab === 'add');
+    safe('tab-list',    tab === 'list');
     safe('tab-totals',  tab === 'totals');
     safe('panel-3d',    tab === '3d');
     safe('panel-form',  tab === 'add');
+    safe('panel-list',  tab === 'list');
     safe('panel-totals',tab === 'totals');
     if (tab === '3d' && window.renderer) window.renderer.resize();
   }
@@ -173,6 +175,7 @@
   function init() {
     window.store.on(vehicles => {
       window.ui.refresh(vehicles);
+      if (window.listView) window.listView.refresh(vehicles);
       if (selectedIdx >= vehicles.length) closeDetail();
       else if (selectedIdx >= 0) window.ui.highlightCard(selectedIdx);
     });
@@ -183,6 +186,12 @@
     if (window.ui.bindSearch) window.ui.bindSearch();
     if (window.renderer) window.renderer.start();
     window.ui.refresh(window.store.getVehicles());
+
+    // Wire list view
+    if (window.listView) {
+      window.listView.bindEvents();
+      window.listView.refresh(window.store.getVehicles());
+    }
 
     // Load daily totals (permanent, never resets)
     if (window.totalsStore) {

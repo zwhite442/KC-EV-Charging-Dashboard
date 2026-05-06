@@ -28,6 +28,11 @@
   let dragActive    = false;
   let dragStartX    = 0;
   let dragStartAngY = 0;
+  let panActive     = false;
+  let panStartX     = 0;
+  let panStartY     = 0;
+  let panOffX       = 0;   // world-space pan offset X
+  let panOffZ       = 0;   // world-space pan offset Z
   let rotInterval   = null;
 
   // ── Lot constants ────────────────────────────────────────────────────────────
@@ -380,9 +385,9 @@
     const cx    = W * 0.5;
     const cy    = H * 0.44;
 
-    // Center offset
-    const offX = -(lotBounds.minX + lotW / 2);
-    const offZ = -(lotBounds.minZ + lotDp / 2);
+    // Center offset — includes pan
+    const offX = -(lotBounds.minX + lotW / 2) + panOffX;
+    const offZ = -(lotBounds.minZ + lotDp / 2) + panOffZ;
 
     const P2 = (x, z) => iso(x + offX, 0, z + offZ, cx, cy, sc);
 
@@ -513,21 +518,50 @@
   window.addEventListener('resize', resize);
 
   // ── Interaction ───────────────────────────────────────────────────────────────
+  // Left drag = rotate | Shift+drag or middle-button drag = pan
   canvas.addEventListener('mousedown', e => {
-    dragActive = true; dragStartX = e.clientX; dragStartAngY = angY;
+    if (e.shiftKey || e.button === 1) {
+      panActive  = true;
+      panStartX  = e.clientX;
+      panStartY  = e.clientY;
+      canvas.style.cursor = 'move';
+    } else {
+      dragActive    = true;
+      dragStartX    = e.clientX;
+      dragStartAngY = angY;
+      canvas.style.cursor = 'grabbing';
+    }
   });
+
   window.addEventListener('mousemove', e => {
+    if (panActive) {
+      // Convert screen delta to world-space pan
+      const dpr = window.devicePixelRatio||1;
+      const rect = canvas.getBoundingClientRect();
+      const sc = Math.min(canvas.width * 0.92, canvas.height * 0.88) /
+                 Math.max(lotBounds.maxX - lotBounds.minX, lotBounds.maxZ - lotBounds.minZ) * zoomLv * dpr;
+      const dx = (e.clientX - panStartX) / sc;
+      const dz = (e.clientY - panStartY) / (sc * 0.42);
+      panOffX += dx * Math.cos(angY) - dz * Math.sin(angY);
+      panOffZ += dx * Math.sin(angY) + dz * Math.cos(angY);
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      return;
+    }
     if (dragActive) angY = dragStartAngY + (e.clientX - dragStartX) / 130;
-    // Hover
+
+    // Hover detection
     const rect = canvas.getBoundingClientRect();
     const dpr  = window.devicePixelRatio||1;
     const mx   = (e.clientX-rect.left)*dpr, my=(e.clientY-rect.top)*dpr;
     let found  = -1;
     for(const h of hitAreas){const dx=mx-h.hx,dy=my-h.hy;if(dx*dx+dy*dy<h.hr*h.hr*5){found=h.vehicleIdx;break;}}
     const prev = window.lot?window.lot.getHoveredIdx():-1;
-    if(found!==prev){if(window.lot)window.lot.setHoveredIdx(found);canvas.style.cursor=found>=0?'pointer':(dragActive?'grabbing':'grab');}
+    if(found!==prev){if(window.lot)window.lot.setHoveredIdx(found);canvas.style.cursor=found>=0?'pointer':(dragActive||panActive?'grabbing':'grab');}
   });
+
   window.addEventListener('mouseup', e => {
+    if (panActive) { panActive = false; canvas.style.cursor = 'grab'; return; }
     if (!dragActive) return;
     if (Math.abs(e.clientX-dragStartX)<6) {
       const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
@@ -537,8 +571,33 @@
     dragActive=false; canvas.style.cursor='grab'; stopRot();
   });
 
-  canvas.addEventListener('touchstart',e=>{dragStartX=e.touches[0].clientX;dragStartAngY=angY;},{passive:true});
-  canvas.addEventListener('touchmove',e=>{angY=dragStartAngY+(e.touches[0].clientX-dragStartX)/130;},{passive:true});
+  // Touch: one finger = rotate, two fingers = pan
+  let touchStartX=0, touchStartY=0, touch2StartX=0, touch2StartY=0, isPinch=false;
+  canvas.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      isPinch=true;
+      touch2StartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      touch2StartY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    } else {
+      isPinch=false;
+      touchStartX=e.touches[0].clientX;
+      dragStartAngY=angY;
+    }
+  },{passive:true});
+  canvas.addEventListener('touchmove',e=>{
+    if(isPinch&&e.touches.length===2){
+      const cx2=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const cy2=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const dpr=window.devicePixelRatio||1;
+      const sc=Math.min(canvas.width*.92,canvas.height*.88)/Math.max(lotBounds.maxX-lotBounds.minX,lotBounds.maxZ-lotBounds.minZ)*zoomLv*dpr;
+      panOffX+=(cx2-touch2StartX)/sc*Math.cos(angY);
+      panOffZ+=(cy2-touch2StartY)/(sc*.42)*Math.cos(angY);
+      touch2StartX=cx2; touch2StartY=cy2;
+    } else if(!isPinch){
+      angY=dragStartAngY+(e.touches[0].clientX-touchStartX)/130;
+    }
+  },{passive:true});
+
   canvas.addEventListener('wheel',e=>{e.preventDefault();zoomLv=Math.max(.2,Math.min(6,zoomLv-e.deltaY*.0006));},{passive:false});
 
   function startRot(dir){stopRot();rotInterval=setInterval(()=>{angY+=dir*.04;},30);}
@@ -561,7 +620,7 @@
   };
 
   window.lotZoom      = d => canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:d<0?-120:120,bubbles:true}));
-  window.lotResetView = () => { angY=0.3; zoomLv=1.0; };
+  window.lotResetView = () => { angY=0.3; zoomLv=1.0; panOffX=0; panOffZ=0; };
 
   resize();
 })();

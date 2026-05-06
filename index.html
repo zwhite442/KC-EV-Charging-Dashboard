@@ -39,14 +39,26 @@
         <span class="dot dot--gray"></span>Total <strong id="stat-total">0</strong>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-pill stat-pill--highlight">
+      <div class="stat-pill stat-pill--highlight tooltip-trigger" id="pill-kwh">
         ⚡ <strong id="stat-total-kwh">0</strong> kWh
+        <div class="stat-tooltip" id="tooltip-kwh">
+          <div class="tt-header">kWh Delivered per Vehicle</div>
+          <div class="tt-list" id="tt-kwh-list"></div>
+        </div>
       </div>
-      <div class="stat-pill">
+      <div class="stat-pill tooltip-trigger" id="pill-avg">
         ⌀ <strong id="stat-avg-kwh">—</strong> kWh/car
+        <div class="stat-tooltip" id="tooltip-avg">
+          <div class="tt-header">kWh per Vehicle (sorted high→low)</div>
+          <div class="tt-list" id="tt-avg-list"></div>
+        </div>
       </div>
-      <div class="stat-pill">
+      <div class="stat-pill tooltip-trigger" id="pill-start">
         📍 Avg Start <strong id="stat-avg-start">—</strong>%
+        <div class="stat-tooltip" id="tooltip-start">
+          <div class="tt-header">Starting SOC per Vehicle</div>
+          <div class="tt-list" id="tt-start-list"></div>
+        </div>
       </div>
     </div>
   </header>
@@ -264,6 +276,33 @@
       </div>
     </section>
 
+    <!-- List View panel -->
+    <section class="panel-list" id="panel-list">
+      <div class="list-toolbar">
+        <input type="search" id="list-search" placeholder="Search VIN, spot, color…" class="list-search-input" />
+        <span class="list-count" id="list-count">0 vehicles</span>
+      </div>
+      <div class="list-table-wrap">
+        <table class="list-table" id="list-table">
+          <thead>
+            <tr>
+              <th>Spot</th>
+              <th>VIN</th>
+              <th>Color</th>
+              <th>Start %</th>
+              <th>End %</th>
+              <th>kWh</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="list-tbody">
+            <tr class="empty-row"><td colspan="8">No vehicles yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Daily Totals panel -->
     <section class="panel-totals" id="panel-totals">
       <div class="totals-scroll">
@@ -365,6 +404,31 @@
 
   </div><!-- /main -->
 
+  <!-- Context menu for list view -->
+  <div class="ctx-menu" id="ctx-menu" style="display:none">
+    <div class="ctx-item" id="ctx-edit">✏️ Edit vehicle</div>
+    <div class="ctx-item" id="ctx-color">🎨 Change color</div>
+    <div class="ctx-item ctx-item--danger" id="ctx-delete">🗑 Remove</div>
+  </div>
+
+  <!-- Edit modal -->
+  <div class="modal-overlay" id="edit-modal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Edit Vehicle</span>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      <div class="field-grid" style="margin-bottom:12px">
+        <div class="field field--full"><label>Parking Spot</label><input id="edit-location" type="text" /></div>
+        <div class="field"><label>Start %</label><input id="edit-start" type="number" min="0" max="100" /></div>
+        <div class="field"><label>End %</label><input id="edit-end" type="number" min="0" max="100" /></div>
+      </div>
+      <div class="section-label" style="margin-bottom:8px">Color</div>
+      <div class="color-picker" id="color-picker"></div>
+      <button class="add-btn" id="edit-save-btn" style="margin-top:14px">Save changes →</button>
+    </div>
+  </div>
+
   <!-- SheetJS for Excel parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- App modules -->
@@ -372,6 +436,7 @@
   <script src="js/renderer.js"></script>
   <script src="js/store.js"></script>
   <script src="js/totals.js"></script>
+  <script src="js/listview.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

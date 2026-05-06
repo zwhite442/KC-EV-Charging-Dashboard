@@ -170,6 +170,21 @@
     emit();
   }
 
+  async function updateVehicle(idx, updated) {
+    const v = vehicles[idx];
+    if (!v) return;
+    // Keep the same IDB id
+    const record = { ...sanitize(updated), id: v.id };
+    await new Promise((resolve, reject) => {
+      const tx  = db.transaction(STORE_NAME, 'readwrite');
+      const req = tx.objectStore(STORE_NAME).put(record);
+      req.onsuccess = () => resolve();
+      req.onerror   = e => reject(e.target.error);
+    });
+    vehicles[idx] = record;
+    emit();
+  }
+
   async function clearAll() {
     await idbClear();
     vehicles = [];
@@ -360,6 +375,7 @@
     addVehicle,
     addVehicles,
     deleteVehicle,
+    updateVehicle,
     clearAll,
     getVehicles,
     parseExcel,
