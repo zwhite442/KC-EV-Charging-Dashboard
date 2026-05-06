@@ -21,7 +21,7 @@
   function updateStats(vehicles) {
     let ready = 0, charging = 0, critical = 0;
     vehicles.forEach(v => {
-      const s = window.EV_COLORS.getStatusColor(v.startPct);
+      const s = window.EV_COLORS.getStatusColor(v.startPct, v.endPct); // uses endPct for ready threshold
       if      (s === '#818cf8') ready++;
       else if (s === '#ef4444') critical++;
       else    charging++;
@@ -101,8 +101,8 @@
     // localIdx is position in filteredVehs; we need real index for selectVehicle
     const realIdx = allVehicles.indexOf(v);
     const pal  = window.EV_COLORS.getPalette(v.color);
-    const sc   = window.EV_COLORS.getStatusColor(v.startPct);
-    const pct  = Math.round(v.startPct);
+    const sc   = v.endPct >= 30 ? '#818cf8' : v.endPct < 10 ? '#ef4444' : '#22c55e';
+    const pct  = Math.round(v.endPct);   // show ending/charged SOC
     const card = document.createElement('div');
     card.className = 'vehicle-card';
     card.style.height = CARD_HEIGHT + 'px';
@@ -182,7 +182,7 @@
 
   // ── Detail card ───────────────────────────────────────────────────────────────
   function showDetail(v) {
-    const sc      = window.EV_COLORS.getStatusColor(v.startPct);
+    const sc      = window.EV_COLORS.getStatusColor(v.startPct, v.endPct);
     const palette = window.EV_COLORS.getPalette(v.color);
     const label   = palette.label || v.color;
 
@@ -247,7 +247,7 @@
   function updatePreview() {
     const s  = parseFloat(document.getElementById('f-start').value) || 0;
     const e  = parseFloat(document.getElementById('f-end').value)   || 0;
-    const sc = s >= 30 ? '#818cf8' : s < 10 ? '#ef4444' : '#22c55e';
+    const sc = e >= 30 ? '#818cf8' : e < 10 ? '#ef4444' : '#22c55e'; // color based on target (end) SOC
 
     const bar = document.getElementById('preview-bar');
     const pct = document.getElementById('preview-pct');

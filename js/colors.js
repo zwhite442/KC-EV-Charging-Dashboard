@@ -91,10 +91,17 @@ window.EV_COLORS.getPalette = function(colorKey) {
  * The "charging" glow on the lot floor only shows while startPct < endPct,
  * regardless of status colour.
  */
-window.EV_COLORS.getStatusColor = function(startPct) {
-  if (startPct >= 30) return '#818cf8'; // full / ready for sale
-  if (startPct < 10)  return '#ef4444'; // critical — needs charge now
-  return '#22c55e';                      // actively charging (10–29%)
+/**
+ * Status is based on ENDING SOC (the target/charged state):
+ *   endPct >= 30  → Ready / full (indigo)
+ *   endPct < 10   → Critical (red)
+ *   else          → Charging / in progress (green)
+ */
+window.EV_COLORS.getStatusColor = function(startPct, endPct) {
+  const soc = (endPct !== undefined) ? endPct : startPct;
+  if (soc >= 30) return '#818cf8'; // ready for sale
+  if (soc < 10)  return '#ef4444'; // critical
+  return '#22c55e';                 // still charging
 };
 
 /**

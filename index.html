@@ -38,6 +38,16 @@
       <div class="stat-pill">
         <span class="dot dot--gray"></span>Total <strong id="stat-total">0</strong>
       </div>
+      <div class="stat-divider"></div>
+      <div class="stat-pill stat-pill--highlight">
+        ⚡ <strong id="stat-total-kwh">0</strong> kWh
+      </div>
+      <div class="stat-pill">
+        ⌀ <strong id="stat-avg-kwh">—</strong> kWh/car
+      </div>
+      <div class="stat-pill">
+        📍 Avg Start <strong id="stat-avg-start">—</strong>%
+      </div>
     </div>
   </header>
 
@@ -254,6 +264,105 @@
       </div>
     </section>
 
+    <!-- Daily Totals panel -->
+    <section class="panel-totals" id="panel-totals">
+      <div class="totals-scroll">
+        <div class="totals-top">
+          <div>
+            <h2 class="form-heading">Daily Totals</h2>
+            <div class="totals-sub">Kept indefinitely — never resets. Import from your Daily Totals sheet or add manually.</div>
+          </div>
+          <div class="totals-actions">
+            <label class="upload-btn">
+              📂 Import from Excel
+              <input type="file" id="totals-file-input" accept=".xlsx,.xls,.csv" />
+            </label>
+            <button class="upload-btn" id="totals-paste-btn">📋 Paste from Excel</button>
+            <button class="upload-btn" id="export-totals-btn">⬇ Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Paste box (hidden by default) -->
+        <div class="totals-paste-wrap" id="totals-paste-wrap" style="display:none">
+          <textarea id="totals-paste-input" class="paste-area"
+            placeholder="Copy rows from your Daily Totals sheet and paste here.&#10;Columns: Date · kWh's · Cars · Avg kWh · Notes"></textarea>
+          <div class="paste-actions">
+            <div class="paste-preview" id="totals-paste-preview"></div>
+            <button class="paste-btn" id="totals-paste-import-btn">Import →</button>
+          </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="totals-summary" id="totals-summary">
+          <div class="summary-card">
+            <div class="summary-label">Total kWh</div>
+            <div class="summary-val" id="sum-kwh">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Total Cars</div>
+            <div class="summary-val" id="sum-cars">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Avg kWh / Car</div>
+            <div class="summary-val" id="sum-avg">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Days Recorded</div>
+            <div class="summary-val" id="sum-days">—</div>
+          </div>
+        </div>
+
+        <!-- Add single day form -->
+        <div class="method-card" style="margin-bottom:16px">
+          <div class="method-header">
+            <span class="method-icon">✏️</span>
+            <div>
+              <div class="method-title">Add / update a day manually</div>
+              <div class="method-sub">If a date already exists it will be overwritten</div>
+            </div>
+          </div>
+          <div class="totals-form-grid">
+            <div class="field">
+              <label for="t-date">Date</label>
+              <input type="date" id="t-date" />
+            </div>
+            <div class="field">
+              <label for="t-kwh">Total kWh</label>
+              <input type="number" id="t-kwh" placeholder="312" min="0" step="0.1" />
+            </div>
+            <div class="field">
+              <label for="t-cars">Cars</label>
+              <input type="number" id="t-cars" placeholder="22" min="0" />
+            </div>
+            <div class="field">
+              <label for="t-notes">Notes</label>
+              <input type="text" id="t-notes" placeholder="Optional" />
+            </div>
+          </div>
+          <button class="add-btn" id="t-add-btn" style="margin-top:10px">Save day →</button>
+        </div>
+
+        <!-- Totals table -->
+        <div class="totals-table-wrap">
+          <table class="totals-table" id="totals-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>kWh's</th>
+                <th>Cars</th>
+                <th class="highlight-col">Avg kWh</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="totals-tbody">
+              <tr class="empty-row"><td colspan="6">No daily totals yet — import from Excel or add a day above</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </div><!-- /main -->
 
   <!-- SheetJS for Excel parsing -->
@@ -262,6 +371,7 @@
   <script src="js/colors.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/totals.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

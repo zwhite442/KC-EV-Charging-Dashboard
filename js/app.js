@@ -12,10 +12,12 @@
   // ── Tab switching ─────────────────────────────────────────────────────────────
   function switchTab(tab) {
     activeTab = tab;
-    document.getElementById('tab-3d').classList.toggle('active',   tab === '3d');
-    document.getElementById('tab-add').classList.toggle('active',  tab === 'add');
-    document.getElementById('panel-3d').classList.toggle('active',  tab === '3d');
-    document.getElementById('panel-form').classList.toggle('active', tab === 'add');
+    document.getElementById('tab-3d').classList.toggle('active',     tab === '3d');
+    document.getElementById('tab-add').classList.toggle('active',    tab === 'add');
+    document.getElementById('tab-totals').classList.toggle('active', tab === 'totals');
+    document.getElementById('panel-3d').classList.toggle('active',     tab === '3d');
+    document.getElementById('panel-form').classList.toggle('active',   tab === 'add');
+    document.getElementById('panel-totals').classList.toggle('active', tab === 'totals');
     if (tab === '3d' && window.renderer) window.renderer.resize();
   }
 
@@ -171,6 +173,12 @@
     if (window.ui.bindSearch) window.ui.bindSearch();
     if (window.renderer) window.renderer.start();
     window.ui.refresh(window.store.getVehicles());
+
+    // Load daily totals (permanent, never resets)
+    if (window.totalsStore) {
+      window.totalsStore.load();
+      window.totalsStore.bindEvents();
+    }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────

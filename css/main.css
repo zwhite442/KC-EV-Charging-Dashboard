@@ -281,3 +281,146 @@ html, body {
 }
 .zoom-btn:hover { background: rgba(255,255,255,.1); }
 .zoom-btn--reset { font-size: 10px; }
+
+/* ── Daily Totals panel ── */
+.panel-totals {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-totals.active { display: flex; }
+
+.totals-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.totals-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.totals-sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+.totals-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.totals-paste-wrap {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+/* ── Summary cards ── */
+.totals-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 700px) { .totals-summary { grid-template-columns: 1fr 1fr; } }
+
+.summary-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.summary-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.summary-val {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* ── Manual entry form grid ── */
+.totals-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 700px) { .totals-form-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ── Totals table ── */
+.totals-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.totals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.totals-table th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.totals-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+.totals-table tr:last-child td { border-bottom: none; }
+.totals-table tr:hover td { background: var(--bg-elevated); }
+
+.highlight-col { color: var(--accent) !important; font-weight: 500; }
+.date-cell { font-weight: 500; white-space: nowrap; }
+.num-cell  { text-align: right; font-variant-numeric: tabular-nums; }
+.notes-cell { color: var(--text-secondary); font-size: 11px; }
+
+.empty-row td {
+  text-align: center;
+  color: var(--text-hint);
+  padding: 24px;
+  font-size: 11px;
+}
+
+.row-del {
+  background: none;
+  border: none;
+  color: var(--text-hint);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  font-family: var(--font);
+  transition: color .1s;
+}
+.row-del:hover { color: var(--red); }
+
+/* ── Topbar stat divider & highlight pill ── */
+.stat-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+.stat-pill--highlight {
+  border-color: rgba(56,139,253,.35);
+  background: rgba(56,139,253,.08);
+  color: var(--accent);
+}
+.stat-pill--highlight strong { color: var(--accent); }
