@@ -253,6 +253,13 @@
           if (!ok) return;
           console.log('Firebase ready — syncing data');
 
+          // Push local vehicles to Firebase immediately if we have them
+          const localVehs = window.store.getVehicles();
+          if (localVehs.length > 0) {
+            console.log('Pushing', localVehs.length, 'local vehicles to Firebase...');
+            window.firebaseSync.saveVehicles(localVehs);
+          }
+
           // Pull vehicles from cloud if local is empty
           window.firebaseSync.listenVehicles(async cloudVehicles => {
             if (cloudVehicles.length > 0 && window.store.getVehicles().length === 0) {
