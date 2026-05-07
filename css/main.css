@@ -852,3 +852,6 @@ html, body {
   padding: 10px 14px 4px;
   flex-shrink: 0;
 }
+
+/* ── Sidebar hidden ── */
+.sidebar { display: none !important; }

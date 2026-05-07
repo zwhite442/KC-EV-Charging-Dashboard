@@ -15,6 +15,7 @@
 
   <!-- Top bar -->
   <header class="topbar">
+    <span id="vehicle-count" style="display:none">0</span>
     <div class="topbar-left">
       <div class="logo">
         <svg class="logo-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -58,29 +59,17 @@
   </div>
 
   <!-- Tab nav -->
-  <!-- Tabs moved into sidebar -->
+  <nav class="tabs">
+    <button class="tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
+    <button class="tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
+    <button class="tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
+    <button class="tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
+  </nav>
 
   <!-- Main layout -->
   <div class="main">
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <span class="sidebar-brand-title">EV Lot Monitor</span>
-        <span class="sidebar-fleet-count" id="vehicle-count">0</span>
-      </div>
-      <nav class="sidebar-nav">
-        <button class="sidebar-tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
-        <button class="sidebar-tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
-        <button class="sidebar-tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
-        <button class="sidebar-tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
-      </nav>
-      <div class="sidebar-section-label">Fleet</div>
-      <div class="vehicle-list" id="vehicle-list">
-        <div class="empty-state">Add vehicles to see them here</div>
-      </div>
-      <div class="sidebar-resize" id="sidebar-resize" title="Drag to resize"></div>
-    </aside>
+
 
     <!-- 3D Canvas panel -->
     <section class="panel-3d active" id="panel-3d">
