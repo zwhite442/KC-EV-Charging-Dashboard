@@ -521,24 +521,30 @@ html, body {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   padding: 4px;
-  min-width: 150px;
+  min-width: 160px;
   z-index: 1000;
   box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  -webkit-user-select: none;
+  user-select: none;
 }
 .ctx-item {
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 14px 14px;
+  font-size: 14px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   transition: background .1s;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  -webkit-tap-highlight-color: rgba(255,255,255,.1);
+  touch-action: manipulation;
 }
-.ctx-item:hover { background: var(--bg-elevated); }
+.ctx-item:hover,
+.ctx-item:active { background: var(--bg-elevated); }
 .ctx-item--danger { color: var(--red); }
-.ctx-item--danger:hover { background: rgba(239,68,68,.1); }
+.ctx-item--danger:hover,
+.ctx-item--danger:active { background: rgba(239,68,68,.1); }
 
 /* ── Edit modal ── */
 .modal-overlay {

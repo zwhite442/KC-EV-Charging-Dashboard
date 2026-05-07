@@ -118,7 +118,7 @@
 
   // ── Sanitise ─────────────────────────────────────────────────────────────────
   function sanitize(v) {
-    const start = clamp(parseNum(v.startPct, 20), 0, 100);
+    const start = clamp(parseNum(v.startPct, 0), 0, 100);  // default 0, not 20
     const end   = clamp(parseNum(v.endPct,   30), 0, 100);
     const pack  = parseNum(v.batteryPack, 0.66);
     return {

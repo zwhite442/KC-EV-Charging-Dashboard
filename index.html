@@ -17,6 +17,7 @@
   <header class="topbar">
     <span id="vehicle-count" style="display:none">0</span>
     <div class="topbar-left">
+      <div id="sync-status" style="font-size:10px;color:#8b949e;margin-top:2px"></div>
       <div class="logo">
         <svg class="logo-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path d="M10 2L3 7v11h14V7L10 2z" fill="none" stroke="currentColor" stroke-width="1.4"/>
@@ -213,7 +214,7 @@
             </div>
             <div class="field">
               <label for="f-start">Starting SOC %</label>
-              <input type="number" id="f-start" placeholder="24" min="0" max="100" />
+              <input type="number" id="f-start" placeholder="0" min="0" max="100" />
             </div>
             <div class="field">
               <label for="f-end">Ending SOC %</label>
@@ -438,10 +439,6 @@
       <button class="add-btn" id="edit-save-btn" style="margin-top:14px">Save changes →</button>
     </div>
   </div>
-
-  <!-- Firebase SDK — loaded directly for reliability -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <!-- SheetJS for Excel parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
