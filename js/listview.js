@@ -273,8 +273,12 @@
   }
 
   function refresh(vehicles) {
-    buildList(vehicles);
-    buildTooltips(vehicles);
+    // Always use passed vehicles, but fall back to store if empty
+    const vehs = (vehicles && vehicles.length > 0)
+      ? vehicles
+      : (window.store ? window.store.getVehicles() : []);
+    buildList(vehs);
+    buildTooltips(vehs);
   }
 
   function bindEvents() {

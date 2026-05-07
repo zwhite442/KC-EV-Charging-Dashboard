@@ -36,9 +36,15 @@
 
     if (tab === '3d' && window.renderer) window.renderer.resize();
 
-    // Always refresh list view with current vehicles when switching to it
+    // Force refresh list view with latest vehicles on every tab switch
     if (tab === 'list' && window.listView) {
-      window.listView.refresh(window.store.getVehicles());
+      const vehs = window.store ? window.store.getVehicles() : [];
+      console.log('Switching to list tab, vehicles:', vehs.length);
+      window.listView.refresh(vehs);
+    }
+    // Also refresh totals tab
+    if (tab === 'totals' && window.totalsStore) {
+      window.totalsStore.bindEvents && window.totalsStore.bindEvents();
     }
   }
 
@@ -241,11 +247,12 @@
     setupSidebarResize();
     window.store.on(vehicles => {
       window.ui.refresh(vehicles);
+      // Always refresh list view regardless of active tab
       if (window.listView) window.listView.refresh(vehicles);
       if (selectedIdx >= vehicles.length) closeDetail();
       else if (selectedIdx >= 0) window.ui.highlightCard(selectedIdx);
 
-      // Auto-save today's totals to Daily Totals whenever vehicles change
+      // Auto-save today's totals whenever vehicles change
       if (window.totalsStore && vehicles.length > 0) {
         const totalKwh = vehicles.reduce((s, v) => {
           return s + window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack || 0.66);
