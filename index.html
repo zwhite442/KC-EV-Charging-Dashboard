@@ -361,7 +361,20 @@
               <input type="text" id="t-notes" placeholder="Optional" />
             </div>
           </div>
-          <button class="add-btn" id="t-add-btn" style="margin-top:10px">Save day →</button>
+          <button class="add-btn" id="t-add-btn" style="margin-top:10px" onclick="
+            var date  = document.getElementById('t-date').value;
+            var kwh   = document.getElementById('t-kwh').value;
+            var cars  = document.getElementById('t-cars').value;
+            var notes = document.getElementById('t-notes').value;
+            if (!date) { alert('Please enter a date.'); return; }
+            if (window.totalsStore) {
+              window.totalsStore.upsert({ date: date, kwh: kwh, cars: cars, notes: notes }).then(function() {
+                document.getElementById('t-kwh').value = '';
+                document.getElementById('t-cars').value = '';
+                document.getElementById('t-notes').value = '';
+              });
+            }
+          ">Save day →</button>
         </div>
 
         <!-- Totals table -->
