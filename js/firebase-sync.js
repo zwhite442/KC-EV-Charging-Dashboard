@@ -56,6 +56,23 @@
       ready = true;
       updateStatus('online');
       console.log('✅ Firebase Firestore ready');
+
+      // Test write to confirm rules allow access
+      try {
+        await db.collection('_test').doc('ping').set({
+          ts: firebase.firestore.FieldValue.serverTimestamp(),
+          from: navigator.userAgent.slice(0, 50),
+        });
+        console.log('✅ Firebase test write succeeded — rules are open');
+        await db.collection('_test').doc('ping').delete();
+      } catch(err) {
+        console.error('❌ Firebase test write FAILED:', err.code, err.message);
+        updateStatus('error');
+        // Show visible error to user
+        const el = document.getElementById('sync-status');
+        if (el) el.innerHTML = '<span style="color:#ef4444">❌ Firebase blocked: ' + err.code + '</span>';
+      }
+
       return true;
     } catch(err) {
       console.error('Firebase init failed:', err);
