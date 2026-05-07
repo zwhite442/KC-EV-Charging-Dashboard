@@ -107,21 +107,40 @@
   async function load() {
     await openDB();
     const raw = await idbGetAll();
-    totals = raw.sort((a, b) => b.dateKey.localeCompare(a.dateKey)); // newest first
+    totals = raw.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
     renderTable();
     renderSummary();
 
-    // Sync from Firebase when totals are empty locally
-    if (window.firebaseSync && window.firebaseSync.isReady()) {
+    // Start Firebase sync — wait for it to be ready if not yet
+    function startFirebaseSync() {
+      if (!window.firebaseSync) return;
       window.firebaseSync.listenDailyTotals(async cloudTotals => {
         if (!cloudTotals.length) return;
-        if (totals.length === 0 && cloudTotals.length > 0) {
+        // Always merge cloud data — replace local with cloud if cloud has more
+        if (cloudTotals.length > totals.length || totals.length === 0) {
+          await idbClear();
           for (const t of cloudTotals) await idbPut(t);
           totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
           renderTable();
           renderSummary();
         }
       });
+    }
+
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      startFirebaseSync();
+    } else {
+      // Wait up to 5 seconds for Firebase to initialize
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (window.firebaseSync && window.firebaseSync.isReady()) {
+          clearInterval(interval);
+          startFirebaseSync();
+        } else if (attempts > 50) {
+          clearInterval(interval); // give up after 5s
+        }
+      }, 100);
     }
   }
 
