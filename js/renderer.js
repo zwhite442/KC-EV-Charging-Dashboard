@@ -175,10 +175,22 @@
   // "1T-22" → "1T-22", "3T-1A" → "3T-1A", "1RL-3" → "1RL-RL-3"
   function parseLocation(loc) {
     if (!loc) return null;
-    const s = String(loc).trim().toUpperCase();
-    // Already looks like section-row e.g. "1T-22", "3T-1A", "1RL-3"
-    if (/^\d+T-/.test(s) || /^\d+RL-/.test(s)) return s;
+    // Normalize: trim whitespace, uppercase
+    let s = String(loc).trim().toUpperCase().replace(/\s+/g, '');
+
+    // Already correct format: "1T-22", "3T-1A", "1RL-3"
+    if (/^\d+T-\S+/.test(s) || /^\d+RL-\S+/.test(s)) return s;
+
+    // Try to fix missing dash: "1T22" → "1T-22", "3T1A" → "3T-1A"
+    const noDash = s.match(/^(\d+T|1RL)(\S+)$/);
+    if (noDash) return noDash[1] + '-' + noDash[2];
+
     return null;
+  }
+
+  // Build all valid spotIds for quick lookup debugging
+  function getValidSpotIds() {
+    return Object.keys(slotBySpotId);
   }
 
   // Assign vehicles to slots. Returns array of {slot, vehicle, vehicleIdx}
@@ -186,11 +198,11 @@
     const assigned   = [];
     const usedSlots  = new Set();
     const overflow   = [];
+    const unmatchedLocs = new Set();
 
     vehs.forEach((v, vi) => {
       const locKey = parseLocation(v.location);
       if (locKey && slotBySpotId[locKey]) {
-        // Find first unused slot in this row
         const available = slotBySpotId[locKey].find(si => !usedSlots.has(si));
         if (available !== undefined) {
           usedSlots.add(available);
@@ -198,8 +210,14 @@
           return;
         }
       }
+      if (v.location) unmatchedLocs.add(v.location);
       overflow.push({ vehicle: v, vehicleIdx: vi });
     });
+
+    if (unmatchedLocs.size > 0) {
+      console.warn('EV Lot: unmatched locations:', [...unmatchedLocs].slice(0,10));
+      console.info('Valid spot IDs sample:', getValidSpotIds().slice(0,10));
+    }
 
     // Place overflow in a staging area south of main lot
     overflow.forEach((o, oi) => {

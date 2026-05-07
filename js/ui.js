@@ -248,10 +248,28 @@
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
   function updateOverlays(count) {
-    document.getElementById('legend').classList.toggle('visible',  count > 0);
-    document.getElementById('rot-bar').classList.toggle('visible', count > 0);
-    document.getElementById('zoom-bar').classList.toggle('visible', count > 0);
-    document.getElementById('drag-hint').classList.toggle('hidden', count > 0);
+    const set = (id, visible) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (visible) {
+        el.classList.add('visible');
+        el.style.display = '';
+      } else {
+        el.classList.remove('visible');
+        el.style.display = 'none';
+      }
+    };
+    set('legend',   count > 0);
+    set('rot-bar',  count > 0);
+    set('zoom-bar', count > 0);
+    // Always show controls even with 0 vehicles so pan toggle is accessible
+    const rotBar = document.getElementById('rot-bar');
+    if (rotBar) { rotBar.classList.add('visible'); rotBar.style.display = 'flex'; }
+    const zoomBar = document.getElementById('zoom-bar');
+    if (zoomBar) { zoomBar.classList.add('visible'); zoomBar.style.display = 'flex'; }
+    // Drag hint only when no vehicles
+    const hint = document.getElementById('drag-hint');
+    if (hint) hint.classList.toggle('hidden', count > 0);
   }
 
   // ── Highlight selected card ───────────────────────────────────────────────────
