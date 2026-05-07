@@ -743,3 +743,8 @@ html, body {
 .ls-charging { color: #22c55e; }
 .ls-critical { color: #ef4444; }
 .ls-kwh      { color: #6ab0e8; }
+
+/* ── Date Added column ── */
+.lv-date { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.list-table th:nth-child(9), .list-table td:nth-child(9) { width: 11%; white-space: nowrap; } /* Date Added */
+.list-table th:nth-child(10), .list-table td:nth-child(10) { width: 5%; text-align: center; } /* Menu */

@@ -133,6 +133,7 @@
       batteryPack: pack,
       rate:        parseNum(v.rate, 11),
       kwh:         autoKwh(start, end, pack),
+      inputDate:   v.inputDate || new Date().toISOString(),
     };
   }
 

@@ -66,6 +66,10 @@
           va=a.endPct>=30?0:a.endPct<10?2:1;
           vb=b.endPct>=30?0:b.endPct<10?2:1;
           break;
+        case 'inputDate':
+          va=a.inputDate||'';
+          vb=b.inputDate||'';
+          break;
         default: va=''; vb='';
       }
       if (typeof va==='string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
@@ -86,13 +90,13 @@
 
     document.querySelectorAll('.list-table th.sortable').forEach(th => {
       const col = th.dataset.col;
-      const labels = {location:'Spot',vin:'VIN',color:'Color',startPct:'Start %',endPct:'End %',kwh:'kWh',batteryPack:'Pack',status:'Status'};
+      const labels = {location:'Spot',vin:'VIN',color:'Color',startPct:'Start %',endPct:'End %',kwh:'kWh',batteryPack:'Pack',status:'Status',inputDate:'Date Added'};
       th.textContent = (labels[col]||col) + (col===sortCol ? (sortAsc?' ↑':' ↓') : ' ↕');
     });
 
     tbody.innerHTML = '';
     if (!filtered.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${vehicles.length?'No vehicles match search':'No vehicles yet — paste from Excel or upload a file'}</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${vehicles.length?'No vehicles match search':'No vehicles yet — paste from Excel or upload a file'}</td></tr>`.replace('colspan="9"','colspan="10"');
       return;
     }
 
@@ -116,6 +120,7 @@
         <td class="lv-num">${kwh} kWh</td>
         <td class="lv-num">${pack}</td>
         <td><span class="lv-status" style="color:${sc}">${status}</span></td>
+        <td class="lv-date">${v.inputDate ? new Date(v.inputDate).toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'}) : '—'}</td>
         <td><button class="lv-menu-btn" data-idx="${realIdx}" title="Options">⋯</button></td>
       `;
       tr.addEventListener('contextmenu', e => { e.preventDefault(); showCtx(e.clientX, e.clientY, realIdx); });
@@ -193,11 +198,12 @@
   function exportCSV() {
     const vehs = window.store.getVehicles();
     if (!vehs.length) { alert('No vehicles to export.'); return; }
-    const header = 'Spot,VIN,Color,Start %,End %,kWh Delivered,Battery Pack,Status\n';
+    const header = 'Spot,VIN,Color,Start %,End %,kWh Delivered,Battery Pack,Status,Date Added\n';
     const rows = vehs.map(v => {
       const kwh    = window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
       const status = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
-      return `${v.location||''},${v.vin||''},${COLOR_LABELS[v.color]||v.color||''},${Math.round(v.startPct)},${Math.round(v.endPct)},${kwh},${Math.round((v.batteryPack||0.66)*100)}%,${status}`;
+      const dateAdded = v.inputDate ? new Date(v.inputDate).toLocaleDateString('en-US') : '';
+      return `${v.location||''},${v.vin||''},${COLOR_LABELS[v.color]||v.color||''},${Math.round(v.startPct)},${Math.round(v.endPct)},${kwh},${Math.round((v.batteryPack||0.66)*100)}%,${status},${dateAdded}`;
     }).join('\n');
     const blob = new Blob([header+rows],{type:'text/csv'});
     const url  = URL.createObjectURL(blob);
