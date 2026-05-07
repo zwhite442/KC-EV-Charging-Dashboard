@@ -110,6 +110,19 @@
     totals = raw.sort((a, b) => b.dateKey.localeCompare(a.dateKey)); // newest first
     renderTable();
     renderSummary();
+
+    // Sync from Firebase when totals are empty locally
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.listenDailyTotals(async cloudTotals => {
+        if (!cloudTotals.length) return;
+        if (totals.length === 0 && cloudTotals.length > 0) {
+          for (const t of cloudTotals) await idbPut(t);
+          totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+          renderTable();
+          renderSummary();
+        }
+      });
+    }
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -123,6 +136,9 @@
     totals.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
     renderTable();
     renderSummary();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.saveDailyTotal(clean);
+    }
   }
 
   async function deleteRow(dateKey) {
@@ -130,6 +146,9 @@
     totals = totals.filter(t => t.dateKey !== dateKey);
     renderTable();
     renderSummary();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.deleteDailyTotal(dateKey);
+    }
   }
 
   function getTotals() { return totals; }

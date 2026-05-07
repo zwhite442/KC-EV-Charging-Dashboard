@@ -152,6 +152,9 @@
     vehicles.push(clean);
     saveMetaStamp();
     emit();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.saveVehicles(vehicles);
+    }
   }
 
   async function addVehicles(list) {
@@ -160,6 +163,9 @@
     vehicles = await idbGetAll();
     saveMetaStamp();
     emit();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.saveVehicles(vehicles);
+    }
   }
 
   async function deleteVehicle(idx) {
@@ -168,6 +174,9 @@
     await idbDelete(v.id);
     vehicles.splice(idx, 1);
     emit();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.saveVehicles(vehicles);
+    }
   }
 
   async function updateVehicle(idx, updated) {
@@ -190,6 +199,9 @@
     vehicles = [];
     clearMetaStamp();
     emit();
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      window.firebaseSync.saveVehicles([]);
+    }
   }
 
   function getVehicles() { return vehicles; }
@@ -217,6 +229,25 @@
     vehicles = await idbGetAll();
     vehicles = vehicles.map(v => ({ ...v, kwh: autoKwh(v.startPct, v.endPct, v.batteryPack) }));
     emit();
+
+    // Start Firebase sync — listen for changes from other devices
+    if (window.firebaseSync) {
+      window.firebaseSync.init().then(ok => {
+        if (!ok) return;
+        // If Firebase has data and local is empty, pull from Firebase
+        window.firebaseSync.listenVehicles(async cloudVehicles => {
+          if (!cloudVehicles.length) return;
+          // Only replace local if cloud has more recent/more data
+          if (cloudVehicles.length > 0 && vehicles.length === 0) {
+            await idbClear();
+            await idbAddMany(cloudVehicles);
+            vehicles = await idbGetAll();
+            vehicles = vehicles.map(v => ({ ...v, kwh: autoKwh(v.startPct, v.endPct, v.batteryPack) }));
+            emit();
+          }
+        });
+      });
+    }
   }
 
   // ── Today's sheet name helpers ────────────────────────────────────────────────

@@ -671,3 +671,13 @@ html, body {
 }
 .tt-total .tt-loc { color: var(--text-secondary); }
 .tt-total .tt-val { color: var(--text-primary); }
+
+/* ── Firebase sync status ── */
+.sync-status {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  cursor: default;
+  letter-spacing: .3px;
+  transition: color .3s;
+}
