@@ -61,7 +61,8 @@
 
   // ── Paste import ──────────────────────────────────────────────────────────────
   function handlePaste() {
-    const text    = (document.getElementById('paste-input').value || '').trim();
+    const input   = document.getElementById('paste-input');
+    const text    = (input.value || '').trim();
     const preview = document.getElementById('paste-preview');
     if (!text) {
       preview.textContent = 'Nothing pasted yet — copy your Excel rows first.';
@@ -70,12 +71,18 @@
     }
     try {
       const parsed = window.store.parsePaste(text);
-      preview.textContent = `✓ Found ${parsed.length} vehicle${parsed.length !== 1 ? 's' : ''} — importing…`;
+      preview.textContent = `⟳ Importing ${parsed.length} vehicle${parsed.length !== 1 ? 's' : ''}…`;
       preview.className   = 'paste-preview paste-preview--ok';
       window.store.addVehicles(parsed).then(() => {
-        document.getElementById('paste-input').value = '';
-        preview.textContent = `✓ ${parsed.length} vehicle${parsed.length !== 1 ? 's' : ''} added to the lot!`;
-        setTimeout(() => switchTab('3d'), 800);
+        // Clear the paste box to confirm data was received
+        input.value = '';
+        preview.textContent = `✅ ${parsed.length} vehicle${parsed.length !== 1 ? 's' : ''} successfully added to the lot!`;
+        preview.className   = 'paste-preview paste-preview--ok';
+        // Switch to 3D view after short delay so user sees the success message
+        setTimeout(() => {
+          switchTab('3d');
+          setTimeout(() => { preview.textContent = ''; }, 500);
+        }, 1200);
       });
     } catch (err) {
       preview.textContent = '✗ ' + err.message;
@@ -143,6 +150,7 @@
   function bindEvents() {
     on('tab-3d',     'click', () => switchTab('3d'));
     on('tab-add',    'click', () => switchTab('add'));
+    on('tab-list',   'click', () => switchTab('list'));
     on('tab-totals', 'click', () => switchTab('totals'));
 
     // Paste
@@ -231,6 +239,20 @@
       if (window.listView) window.listView.refresh(vehicles);
       if (selectedIdx >= vehicles.length) closeDetail();
       else if (selectedIdx >= 0) window.ui.highlightCard(selectedIdx);
+
+      // Auto-save today's totals to Daily Totals whenever vehicles change
+      if (window.totalsStore && vehicles.length > 0) {
+        const totalKwh = vehicles.reduce((s, v) => {
+          return s + window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack || 0.66);
+        }, 0);
+        const today = new Date().toISOString().slice(0, 10);
+        window.totalsStore.upsert({
+          date:  today,
+          kwh:   Math.round(totalKwh * 10) / 10,
+          cars:  vehicles.length,
+          notes: '',
+        });
+      }
     });
 
     window.store.load();

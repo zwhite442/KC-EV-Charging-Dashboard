@@ -1,341 +1,328 @@
 /**
- * listview.js
- * List View tab — spreadsheet-style table of all vehicles.
- * Features:
- *  - Search/filter
- *  - Right-click context menu: Edit, Change Color, Remove
- *  - Edit modal with spot, start%, end%, color picker
- *  - Hover tooltips on the 3 topbar stat pills
+ * listview.js — Full List View tab
+ * Shows every vehicle in the lot in a sortable, searchable table.
+ * Right-click or ⋯ button to Edit / Change Color / Remove.
+ * Also manages hover tooltips on the 3 topbar stat pills.
  */
 
 (function () {
   const BOLT_COLORS = ['red','black','white','silver','blue','gray','midnight','green'];
   const COLOR_LABELS = {
-    red:'Radiant Red', black:'Mosaic Black', white:'Summit White', silver:'Sterling Gray',
-    blue:'Riptide Blue', gray:'Gray', midnight:'Midnight Blue', green:'Cacti Green',
+    red:'Radiant Red', black:'Mosaic Black', white:'Summit White',
+    silver:'Sterling Gray', blue:'Riptide Blue', gray:'Gray',
+    midnight:'Midnight Blue', green:'Cacti Green',
   };
 
-  let ctxVehicleIdx = -1;
-  let editVehicleIdx = -1;
-  let listQuery = '';
+  let ctxIdx    = -1;
+  let editIdx   = -1;
+  let query     = '';
+  let sortCol   = 'location';
+  let sortAsc   = true;
 
-  // ── Build list table ──────────────────────────────────────────────────────────
+  function updateSummaryBar(vehicles) {
+    let ready=0, charging=0, critical=0, totalKwh=0, totalStart=0;
+    vehicles.forEach(v => {
+      if      (v.endPct >= 30) ready++;
+      else if (v.endPct < 10)  critical++;
+      else                     charging++;
+      totalKwh   += window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
+      totalStart += (v.startPct||0);
+    });
+    const n = vehicles.length;
+    const set = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+    set('ls-total',     n);
+    set('ls-ready',     ready);
+    set('ls-charging',  charging);
+    set('ls-critical',  critical);
+    set('ls-kwh',       Math.round(totalKwh*10)/10);
+    set('ls-avg-kwh',   n>0 ? Math.round((totalKwh/n)*10)/10 : '—');
+    set('ls-avg-start', n>0 ? Math.round((totalStart/n)*100)/100+'%' : '—');
+  }
+
+  function filterAndSort(vehicles) {
+    const q = query.toLowerCase().trim();
+    let list = q ? vehicles.filter(v =>
+      (v.vin||'').toLowerCase().includes(q) ||
+      (v.location||'').toLowerCase().includes(q) ||
+      (v.color||'').toLowerCase().includes(q) ||
+      String(v.startPct).includes(q) ||
+      String(v.endPct).includes(q)
+    ) : [...vehicles];
+
+    list.sort((a,b) => {
+      let va, vb;
+      switch(sortCol) {
+        case 'location':    va=a.location||'';  vb=b.location||''; break;
+        case 'vin':         va=a.vin||'';        vb=b.vin||''; break;
+        case 'color':       va=a.color||'';      vb=b.color||''; break;
+        case 'startPct':    va=a.startPct||0;    vb=b.startPct||0; break;
+        case 'endPct':      va=a.endPct||0;      vb=b.endPct||0; break;
+        case 'kwh':
+          va=window.EV_COLORS.calcKwh(a.startPct,a.endPct,a.batteryPack||0.66);
+          vb=window.EV_COLORS.calcKwh(b.startPct,b.endPct,b.batteryPack||0.66);
+          break;
+        case 'batteryPack': va=a.batteryPack||0.66; vb=b.batteryPack||0.66; break;
+        case 'status':
+          va=a.endPct>=30?0:a.endPct<10?2:1;
+          vb=b.endPct>=30?0:b.endPct<10?2:1;
+          break;
+        default: va=''; vb='';
+      }
+      if (typeof va==='string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sortAsc ? va-vb : vb-va;
+    });
+    return list;
+  }
+
   function buildList(vehicles) {
-    const tbody = document.getElementById('list-tbody');
+    const tbody   = document.getElementById('list-tbody');
     const countEl = document.getElementById('list-count');
     if (!tbody) return;
 
-    const q = listQuery.toLowerCase().trim();
-    const filtered = q
-      ? vehicles.filter(v =>
-          (v.vin||'').toLowerCase().includes(q) ||
-          (v.location||'').toLowerCase().includes(q) ||
-          (v.color||'').toLowerCase().includes(q) ||
-          String(v.startPct).includes(q) ||
-          String(v.endPct).includes(q)
-        )
-      : vehicles;
+    updateSummaryBar(vehicles);
 
-    if (countEl) countEl.textContent = `${filtered.length} vehicle${filtered.length!==1?'s':''}`;
+    const filtered = filterAndSort(vehicles);
+    if (countEl) countEl.textContent = `${filtered.length.toLocaleString()} vehicle${filtered.length!==1?'s':''}`;
+
+    document.querySelectorAll('.list-table th.sortable').forEach(th => {
+      const col = th.dataset.col;
+      const labels = {location:'Spot',vin:'VIN',color:'Color',startPct:'Start %',endPct:'End %',kwh:'kWh',batteryPack:'Pack',status:'Status'};
+      th.textContent = (labels[col]||col) + (col===sortCol ? (sortAsc?' ↑':' ↓') : ' ↕');
+    });
+
     tbody.innerHTML = '';
-
     if (!filtered.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No vehicles match your search</td></tr>';
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${vehicles.length?'No vehicles match search':'No vehicles yet — paste from Excel or upload a file'}</td></tr>`;
       return;
     }
 
-    filtered.forEach((v, localIdx) => {
+    const frag = document.createDocumentFragment();
+    filtered.forEach(v => {
       const realIdx = vehicles.indexOf(v);
       const pal     = window.EV_COLORS.getPalette(v.color);
-      const sc      = window.EV_COLORS.getStatusColor(v.startPct, v.endPct);
-      const statusLabel = sc==='#818cf8'?'Ready':sc==='#ef4444'?'Critical':'Charging';
+      const sc      = v.endPct>=30?'#818cf8':v.endPct<10?'#ef4444':'#22c55e';
+      const status  = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
+      const kwh     = window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
+      const pack    = Math.round((v.batteryPack||0.66)*100)+'%';
+
       const tr = document.createElement('tr');
       tr.dataset.idx = realIdx;
       tr.innerHTML = `
         <td class="lv-spot">${v.location||'—'}</td>
         <td class="lv-vin">${v.vin||'—'}</td>
-        <td class="lv-color">
-          <span class="lv-swatch" style="background:${pal.body}"></span>
-          ${COLOR_LABELS[v.color]||v.color||'—'}
-        </td>
+        <td class="lv-color"><span class="lv-swatch" style="background:${pal.body}"></span>${COLOR_LABELS[v.color]||v.color||'—'}</td>
         <td class="lv-num">${Math.round(v.startPct)}%</td>
         <td class="lv-num">${Math.round(v.endPct)}%</td>
-        <td class="lv-num">${v.kwh||0} kWh</td>
-        <td><span class="lv-status" style="color:${sc}">${statusLabel}</span></td>
-        <td>
-          <button class="lv-menu-btn" data-idx="${realIdx}" title="Options">⋯</button>
-        </td>
+        <td class="lv-num">${kwh} kWh</td>
+        <td class="lv-num">${pack}</td>
+        <td><span class="lv-status" style="color:${sc}">${status}</span></td>
+        <td><button class="lv-menu-btn" data-idx="${realIdx}" title="Options">⋯</button></td>
       `;
-
-      // Right-click
-      tr.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        showCtxMenu(e.clientX, e.clientY, realIdx);
-      });
-
-      // ⋯ button click
+      tr.addEventListener('contextmenu', e => { e.preventDefault(); showCtx(e.clientX, e.clientY, realIdx); });
       tr.querySelector('.lv-menu-btn').addEventListener('click', e => {
         e.stopPropagation();
-        const btn = e.currentTarget;
-        const r   = btn.getBoundingClientRect();
-        showCtxMenu(r.left, r.bottom + 4, realIdx);
+        const r = e.currentTarget.getBoundingClientRect();
+        showCtx(r.left, r.bottom+4, realIdx);
       });
-
-      tbody.appendChild(tr);
+      frag.appendChild(tr);
     });
+    tbody.appendChild(frag);
   }
 
-  // ── Context menu ──────────────────────────────────────────────────────────────
-  function showCtxMenu(x, y, idx) {
-    ctxVehicleIdx = idx;
+  function showCtx(x, y, idx) {
+    ctxIdx = idx;
     const menu = document.getElementById('ctx-menu');
     if (!menu) return;
     menu.style.display = 'block';
-    // Keep on screen
-    const vw = window.innerWidth, vh = window.innerHeight;
-    menu.style.left = Math.min(x, vw - 160) + 'px';
-    menu.style.top  = Math.min(y, vh - 120) + 'px';
+    menu.style.left = Math.min(x, window.innerWidth-165)+'px';
+    menu.style.top  = Math.min(y, window.innerHeight-125)+'px';
+  }
+  function hideCtx() {
+    const m=document.getElementById('ctx-menu');
+    if(m) m.style.display='none';
+    ctxIdx=-1;
   }
 
-  function hideCtxMenu() {
-    const menu = document.getElementById('ctx-menu');
-    if (menu) menu.style.display = 'none';
-    ctxVehicleIdx = -1;
-  }
-
-  // ── Edit modal ────────────────────────────────────────────────────────────────
-  function openEditModal(idx) {
-    const vehs = window.store.getVehicles();
-    const v    = vehs[idx];
+  function openEdit(idx) {
+    const v = window.store.getVehicles()[idx];
     if (!v) return;
-    editVehicleIdx = idx;
-
-    document.getElementById('edit-location').value = v.location || '';
+    editIdx = idx;
+    document.getElementById('edit-location').value = v.location||'';
     document.getElementById('edit-start').value    = Math.round(v.startPct);
     document.getElementById('edit-end').value      = Math.round(v.endPct);
-
-    // Build color picker
     const picker = document.getElementById('color-picker');
-    picker.innerHTML = '';
-    BOLT_COLORS.forEach(col => {
-      const pal = window.EV_COLORS.getPalette(col);
-      const btn = document.createElement('div');
-      btn.className = 'color-swatch-btn' + (v.color === col ? ' selected' : '');
-      btn.title     = COLOR_LABELS[col]||col;
-      btn.style.background = pal.body;
-      btn.dataset.color    = col;
-      btn.addEventListener('click', () => {
-        picker.querySelectorAll('.color-swatch-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
+    if (picker) {
+      picker.innerHTML = '';
+      BOLT_COLORS.forEach(col => {
+        const pal = window.EV_COLORS.getPalette(col);
+        const btn = document.createElement('div');
+        btn.className = 'color-swatch-btn'+(v.color===col?' selected':'');
+        btn.title = COLOR_LABELS[col]||col;
+        btn.style.background = pal.body;
+        btn.dataset.color = col;
+        btn.addEventListener('click', () => {
+          picker.querySelectorAll('.color-swatch-btn').forEach(b=>b.classList.remove('selected'));
+          btn.classList.add('selected');
+        });
+        picker.appendChild(btn);
       });
-      picker.appendChild(btn);
-    });
-
-    document.getElementById('edit-modal').style.display = 'flex';
+    }
+    const modal = document.getElementById('edit-modal');
+    if (modal) modal.style.display = 'flex';
   }
 
-  function closeEditModal() {
-    document.getElementById('edit-modal').style.display = 'none';
-    editVehicleIdx = -1;
+  function closeEdit() {
+    const modal = document.getElementById('edit-modal');
+    if (modal) modal.style.display = 'none';
+    editIdx = -1;
   }
 
   async function saveEdit() {
-    if (editVehicleIdx < 0) return;
-    const vehs     = window.store.getVehicles();
-    const v        = vehs[editVehicleIdx];
+    if (editIdx < 0) return;
+    const v = window.store.getVehicles()[editIdx];
     if (!v) return;
-
-    const location = document.getElementById('edit-location').value.trim();
-    const startPct = parseFloat(document.getElementById('edit-start').value) || v.startPct;
-    const endPct   = parseFloat(document.getElementById('edit-end').value)   || v.endPct;
-    const colorBtn = document.querySelector('#color-picker .color-swatch-btn.selected');
-    const color    = colorBtn ? colorBtn.dataset.color : v.color;
-
-    // Update via store — delete old, insert updated at same position
-    const updated = { ...v, location, startPct, endPct, color,
-      kwh: window.EV_COLORS.calcKwh(startPct, endPct, v.batteryPack) };
-
-    // Direct IDB update
-    await window.store.updateVehicle(editVehicleIdx, updated);
-    closeEditModal();
+    const loc  = document.getElementById('edit-location').value.trim();
+    const sp   = parseFloat(document.getElementById('edit-start').value)||v.startPct;
+    const ep   = parseFloat(document.getElementById('edit-end').value)||v.endPct;
+    const cBtn = document.querySelector('#color-picker .color-swatch-btn.selected');
+    const col  = cBtn ? cBtn.dataset.color : v.color;
+    await window.store.updateVehicle(editIdx, {...v, location:loc, startPct:sp, endPct:ep, color:col});
+    closeEdit();
   }
 
-  // ── Hover tooltips — auto-calculated from vehicle data ───────────────────────
+  function exportCSV() {
+    const vehs = window.store.getVehicles();
+    if (!vehs.length) { alert('No vehicles to export.'); return; }
+    const header = 'Spot,VIN,Color,Start %,End %,kWh Delivered,Battery Pack,Status\n';
+    const rows = vehs.map(v => {
+      const kwh    = window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
+      const status = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
+      return `${v.location||''},${v.vin||''},${COLOR_LABELS[v.color]||v.color||''},${Math.round(v.startPct)},${Math.round(v.endPct)},${kwh},${Math.round((v.batteryPack||0.66)*100)}%,${status}`;
+    }).join('\n');
+    const blob = new Blob([header+rows],{type:'text/csv'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url; a.download=`ev-lot-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function buildTooltips(vehicles) {
     const kwhList   = document.getElementById('tt-kwh-list');
     const avgList   = document.getElementById('tt-avg-list');
     const startList = document.getElementById('tt-start-list');
-    if (!kwhList || !avgList || !startList || !vehicles.length) return;
+    if (!kwhList||!avgList||!startList) return;
 
-    // Calculate kWh for each vehicle on the fly (always up to date)
-    const withKwh = vehicles.map(v => ({
-      loc:   v.location || '?',
-      kwh:   window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack || 0.66),
-      start: Math.round(v.startPct || 0),
+    if (!vehicles.length) {
+      const empty = '<div class="tt-row"><span class="tt-loc" style="color:var(--text-hint)">No vehicles yet</span></div>';
+      kwhList.innerHTML = avgList.innerHTML = startList.innerHTML = empty;
+      return;
+    }
+
+    const withData = vehicles.map(v=>({
+      loc:   v.location||'?',
+      kwh:   window.EV_COLORS.calcKwh(v.startPct,v.endPct,v.batteryPack||0.66),
+      start: Math.round(v.startPct||0),
     }));
+    const byKwh   = [...withData].sort((a,b)=>b.kwh-a.kwh);
+    const byStart = [...withData].sort((a,b)=>a.start-b.start);
+    const totalKwh = byKwh.reduce((s,v)=>s+v.kwh,0);
+    const avg      = vehicles.length>0 ? Math.round((totalKwh/vehicles.length)*10)/10 : 0;
+    const avgSt    = vehicles.length>0 ? Math.round(byStart.reduce((s,v)=>s+v.start,0)/vehicles.length*100)/100 : 0;
 
-    // kWh tooltip — sorted high to low
-    const byKwh = [...withKwh].sort((a,b) => b.kwh - a.kwh);
-    const totalKwh = byKwh.reduce((s,v) => s + v.kwh, 0);
-    kwhList.innerHTML = byKwh.map(v =>
-      `<div class="tt-row">
-        <span class="tt-loc">${v.loc}</span>
-        <span class="tt-val">${v.kwh} kWh</span>
-      </div>`
-    ).join('') +
-    `<div class="tt-row tt-total">
-      <span class="tt-loc">Total</span>
-      <span class="tt-val">${Math.round(totalKwh * 10)/10} kWh</span>
-    </div>`;
+    const row   = (loc,val) => `<div class="tt-row"><span class="tt-loc">${loc}</span><span class="tt-val">${val}</span></div>`;
+    const total = (lbl,val) => `<div class="tt-row tt-total"><span class="tt-loc">${lbl}</span><span class="tt-val">${val}</span></div>`;
 
-    // Avg kWh/car tooltip — same data, shows average at bottom
-    const avg = vehicles.length > 0 ? Math.round((totalKwh / vehicles.length) * 10) / 10 : 0;
-    avgList.innerHTML = byKwh.map(v =>
-      `<div class="tt-row">
-        <span class="tt-loc">${v.loc}</span>
-        <span class="tt-val">${v.kwh} kWh</span>
-      </div>`
-    ).join('') +
-    `<div class="tt-row tt-total">
-      <span class="tt-loc">Average</span>
-      <span class="tt-val">${avg} kWh/car</span>
-    </div>`;
-
-    // Starting SOC tooltip — sorted lowest first (most critical at top)
-    const byStart = [...withKwh].sort((a,b) => a.start - b.start);
-    const avgStart = vehicles.length > 0
-      ? Math.round(byStart.reduce((s,v) => s + v.start, 0) / vehicles.length * 100) / 100 : 0;
-    startList.innerHTML = byStart.map(v =>
-      `<div class="tt-row">
-        <span class="tt-loc">${v.loc}</span>
-        <span class="tt-val">${v.start}%</span>
-      </div>`
-    ).join('') +
-    `<div class="tt-row tt-total">
-      <span class="tt-loc">Average</span>
-      <span class="tt-val">${avgStart}%</span>
-    </div>`;
+    kwhList.innerHTML   = byKwh.map(v=>row(v.loc,v.kwh+' kWh')).join('')+total('Total',Math.round(totalKwh*10)/10+' kWh');
+    avgList.innerHTML   = byKwh.map(v=>row(v.loc,v.kwh+' kWh')).join('')+total('Average',avg+' kWh/car');
+    startList.innerHTML = byStart.map(v=>row(v.loc,v.start+'%')).join('')+total('Average',avgSt+'%');
   }
 
-  // ── Refresh (called on every store change) ────────────────────────────────────
+  function initTooltips() {
+    const PAIRS=[
+      {triggerId:'pill-kwh',   tooltipId:'tooltip-kwh'},
+      {triggerId:'pill-avg',   tooltipId:'tooltip-avg'},
+      {triggerId:'pill-start', tooltipId:'tooltip-start'},
+    ];
+    let active = null;
+
+    function show(trigger, tooltip) {
+      if (active && active!==tooltip) active.classList.remove('visible');
+      const r = trigger.getBoundingClientRect();
+      let left = r.right-260;
+      if (left<8) left=8;
+      if (left+260>window.innerWidth-8) left=window.innerWidth-268;
+      tooltip.style.left = left+'px';
+      tooltip.style.top  = (r.bottom+6)+'px';
+      tooltip.classList.add('visible');
+      active = tooltip;
+    }
+    function hide(t) { t.classList.remove('visible'); if(active===t) active=null; }
+
+    PAIRS.forEach(({triggerId,tooltipId}) => {
+      const trigger = document.getElementById(triggerId);
+      const tooltip = document.getElementById(tooltipId);
+      if (!trigger||!tooltip) return;
+      trigger.addEventListener('mouseenter', () => show(trigger,tooltip));
+      trigger.addEventListener('mouseleave', () => setTimeout(()=>{ if(!tooltip.matches(':hover')) hide(tooltip); },120));
+      tooltip.addEventListener('mouseleave', () => hide(tooltip));
+    });
+    document.addEventListener('click', () => {
+      PAIRS.forEach(({tooltipId})=>{ const t=document.getElementById(tooltipId); if(t) t.classList.remove('visible'); });
+      active=null;
+    });
+  }
+
   function refresh(vehicles) {
     buildList(vehicles);
     buildTooltips(vehicles);
   }
 
-  // ── Wire events ───────────────────────────────────────────────────────────────
   function bindEvents() {
-    // Context menu actions
-    const ctxEdit = document.getElementById('ctx-edit');
-    const ctxColor = document.getElementById('ctx-color');
-    const ctxDelete = document.getElementById('ctx-delete');
-
-    if (ctxEdit)   ctxEdit.addEventListener('click',   () => { openEditModal(ctxVehicleIdx); hideCtxMenu(); });
-    if (ctxColor)  ctxColor.addEventListener('click',  () => { openEditModal(ctxVehicleIdx); hideCtxMenu(); });
-    if (ctxDelete) ctxDelete.addEventListener('click', async () => {
-      const idx = ctxVehicleIdx;
-      hideCtxMenu();
-      if (idx < 0) return;
-      const v = window.store.getVehicles()[idx];
-      if (confirm(`Remove ${v?.location||'this vehicle'} (${v?.vin||''})?`)) {
-        await window.store.deleteVehicle(idx);
-        if (window.lot) window.lot.closeDetail();
-      }
-    });
-
-    // Close ctx menu on any outside click
-    document.addEventListener('click', e => {
-      const menu = document.getElementById('ctx-menu');
-      if (menu && !menu.contains(e.target)) hideCtxMenu();
-    });
-
-    // Edit modal
-    const modalClose = document.getElementById('modal-close');
-    const saveBtn    = document.getElementById('edit-save-btn');
-    if (modalClose) modalClose.addEventListener('click', closeEditModal);
-    if (saveBtn)    saveBtn.addEventListener('click', saveEdit);
-
-    // Close modal on overlay click
-    const modalOverlay = document.getElementById('edit-modal');
-    if (modalOverlay) modalOverlay.addEventListener('click', e => {
-      if (e.target === modalOverlay) closeEditModal();
-    });
-
-    // List search
-    const listSearch = document.getElementById('list-search');
-    if (listSearch) {
-      listSearch.addEventListener('input', e => {
-        listQuery = e.target.value;
+    // Sort headers
+    document.querySelectorAll('.list-table th.sortable').forEach(th => {
+      th.style.cursor='pointer';
+      th.addEventListener('click', () => {
+        const col=th.dataset.col;
+        if(sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=true; }
         buildList(window.store.getVehicles());
       });
-    }
+    });
+
+    // Search
+    const search=document.getElementById('list-search');
+    if(search) search.addEventListener('input', e=>{ query=e.target.value; buildList(window.store.getVehicles()); });
+
+    // Export
+    const exportBtn=document.getElementById('list-export-btn');
+    if(exportBtn) exportBtn.addEventListener('click', exportCSV);
+
+    // Context menu
+    const ctxEdit=document.getElementById('ctx-edit');
+    const ctxColor=document.getElementById('ctx-color');
+    const ctxDelete=document.getElementById('ctx-delete');
+    if(ctxEdit)   ctxEdit.addEventListener('click',  ()=>{ openEdit(ctxIdx); hideCtx(); });
+    if(ctxColor)  ctxColor.addEventListener('click', ()=>{ openEdit(ctxIdx); hideCtx(); });
+    if(ctxDelete) ctxDelete.addEventListener('click', async ()=>{
+      const idx=ctxIdx; hideCtx();
+      if(idx<0) return;
+      const v=window.store.getVehicles()[idx];
+      if(confirm(`Remove ${v?.location||'this vehicle'} (${v?.vin||''})?`)) {
+        await window.store.deleteVehicle(idx);
+        if(window.lot) window.lot.closeDetail();
+      }
+    });
+    document.addEventListener('click', e=>{ const m=document.getElementById('ctx-menu'); if(m&&!m.contains(e.target)) hideCtx(); });
+
+    // Edit modal
+    const modalClose=document.getElementById('modal-close');
+    const saveBtn=document.getElementById('edit-save-btn');
+    const overlay=document.getElementById('edit-modal');
+    if(modalClose) modalClose.addEventListener('click', closeEdit);
+    if(saveBtn)    saveBtn.addEventListener('click', saveEdit);
+    if(overlay)    overlay.addEventListener('click', e=>{ if(e.target===overlay) closeEdit(); });
+
+    initTooltips();
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────────
   window.listView = { refresh, buildList, buildTooltips, bindEvents };
-})();
-
-// ── Tooltip hover logic ──────────────────────────────────────────────────────
-// Tooltips live at body level to avoid any overflow/clip issues.
-// Triggered by mouseenter/leave on the stat pills.
-(function initTooltips() {
-  const PAIRS = [
-    { triggerId: 'pill-kwh',   tooltipId: 'tooltip-kwh'   },
-    { triggerId: 'pill-avg',   tooltipId: 'tooltip-avg'   },
-    { triggerId: 'pill-start', tooltipId: 'tooltip-start' },
-  ];
-
-  let activeTooltip = null;
-
-  function show(trigger, tooltip) {
-    // Hide any other open tooltip first
-    if (activeTooltip && activeTooltip !== tooltip) {
-      activeTooltip.classList.remove('visible');
-    }
-    const r   = trigger.getBoundingClientRect();
-    const tw  = 260;
-    let   left = r.right - tw;
-    if (left < 8) left = 8;
-    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
-    tooltip.style.left = left + 'px';
-    tooltip.style.top  = (r.bottom + 6) + 'px';
-    tooltip.classList.add('visible');
-    activeTooltip = tooltip;
-  }
-
-  function hide(tooltip) {
-    tooltip.classList.remove('visible');
-    if (activeTooltip === tooltip) activeTooltip = null;
-  }
-
-  function wire() {
-    PAIRS.forEach(({ triggerId, tooltipId }) => {
-      const trigger = document.getElementById(triggerId);
-      const tooltip = document.getElementById(tooltipId);
-      if (!trigger || !tooltip) return;
-
-      trigger.addEventListener('mouseenter', () => show(trigger, tooltip));
-      trigger.addEventListener('mouseleave', () => {
-        setTimeout(() => {
-          if (!tooltip.matches(':hover')) hide(tooltip);
-        }, 120);
-      });
-      tooltip.addEventListener('mouseleave', () => hide(tooltip));
-    });
-
-    // Close all tooltips on click anywhere
-    document.addEventListener('click', () => {
-      PAIRS.forEach(({ tooltipId }) => {
-        const t = document.getElementById(tooltipId);
-        if (t) t.classList.remove('visible');
-      });
-      activeTooltip = null;
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
 })();

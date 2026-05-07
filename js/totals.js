@@ -258,21 +258,36 @@
         const key = e.target.dataset.key;
         if (confirm(`Delete entry for ${formatDisplay(key)}?`)) deleteRow(key);
       });
+
+      // Right-click to delete
+      tr.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const key = t.dateKey;
+        if (confirm(`Delete entry for ${formatDisplay(key)}?`)) deleteRow(key);
+      });
+
       tbody.appendChild(tr);
     });
   }
 
-  // ── Render summary cards ──────────────────────────────────────────────────────
+  // ── Render summary cards — shows TODAY's totals only ────────────────────────
   function renderSummary() {
-    const totalKwh  = totals.reduce((s, t) => s + t.kwh, 0);
-    const totalCars = totals.reduce((s, t) => s + t.cars, 0);
-    const avgKwh    = totalCars > 0 ? Math.round((totalKwh / totalCars) * 100) / 100 : 0;
+    const todayKey  = new Date().toISOString().slice(0, 10);
+    const todayRec  = totals.find(t => t.dateKey === todayKey);
 
     const el = id => document.getElementById(id);
-    if (el('sum-kwh'))  el('sum-kwh').textContent  = totalKwh.toLocaleString(undefined, {maximumFractionDigits:1});
-    if (el('sum-cars')) el('sum-cars').textContent = totalCars.toLocaleString();
-    if (el('sum-avg'))  el('sum-avg').textContent  = avgKwh;
-    if (el('sum-days')) el('sum-days').textContent = totals.length;
+    if (el('sum-kwh'))  el('sum-kwh').textContent  = todayRec ? todayRec.kwh.toLocaleString(undefined, {maximumFractionDigits:1}) : '—';
+    if (el('sum-cars')) el('sum-cars').textContent  = todayRec ? todayRec.cars.toLocaleString() : '—';
+    if (el('sum-avg'))  el('sum-avg').textContent   = todayRec ? todayRec.avg : '—';
+    if (el('sum-days')) el('sum-days').textContent  = totals.length; // total days recorded (historical count)
+
+    // Update summary card labels to make it clear these are today's numbers
+    const kwhLabel   = document.querySelector('#sum-kwh').closest('.summary-card')?.querySelector('.summary-label');
+    const carsLabel  = document.querySelector('#sum-cars').closest('.summary-card')?.querySelector('.summary-label');
+    const avgLabel   = document.querySelector('#sum-avg').closest('.summary-card')?.querySelector('.summary-label');
+    if (kwhLabel)  kwhLabel.textContent  = "Today's kWh";
+    if (carsLabel) carsLabel.textContent = "Today's Cars";
+    if (avgLabel)  avgLabel.textContent  = "Today's Avg kWh";
   }
 
   // ── Wire up DOM events ────────────────────────────────────────────────────────
