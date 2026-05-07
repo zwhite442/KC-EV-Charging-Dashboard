@@ -412,5 +412,16 @@
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
-  window.totalsStore = { load, getTotals, upsert, deleteRow, exportCSV, bindEvents };
+  async function mergeFromCloud(cloudTotals) {
+    if (!cloudTotals.length) return;
+    for (const t of cloudTotals) {
+      if (t.dateKey) await idbPut(t);
+    }
+    const all = await idbGetAll();
+    totals = all.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+    renderTable();
+    renderSummary();
+  }
+
+  window.totalsStore = { load, getTotals, upsert, deleteRow, exportCSV, bindEvents, mergeFromCloud };
 })();
