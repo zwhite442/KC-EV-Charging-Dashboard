@@ -223,7 +223,7 @@ html, body {
   bottom: 56px;
   left: 50%;
   transform: translateX(-50%);
-  display: none;
+  display: flex;
   align-items: center;
   gap: 12px;
   background: rgba(10,14,26,.88);
@@ -258,7 +258,7 @@ html, body {
   position: absolute;
   bottom: 56px;
   right: 12px;
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 4px;
   z-index: 5;
