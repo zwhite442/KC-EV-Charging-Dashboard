@@ -31,10 +31,15 @@
       if (!el) return;
       const isActive = t === tab;
       el.classList.toggle('active', isActive);
-      el.style.display = isActive ? (t === '3d' ? 'flex' : 'flex') : 'none';
+      el.style.display = isActive ? 'flex' : 'none';
     });
 
     if (tab === '3d' && window.renderer) window.renderer.resize();
+
+    // Always refresh list view with current vehicles when switching to it
+    if (tab === 'list' && window.listView) {
+      window.listView.refresh(window.store.getVehicles());
+    }
   }
 
   // ── Vehicle selection ─────────────────────────────────────────────────────────
