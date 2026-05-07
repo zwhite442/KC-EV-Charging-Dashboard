@@ -304,7 +304,9 @@
     if (!input) return;
     input.addEventListener('input', e => {
       filterQuery = e.target.value;
-      buildSidebar(allVehicles);
+      // Always pull freshest data from store
+      const vehs = window.store ? window.store.getVehicles() : allVehicles;
+      buildSidebar(vehs);
     });
   }
 
