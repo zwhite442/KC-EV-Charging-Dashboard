@@ -260,9 +260,12 @@
             window.firebaseSync.saveVehicles(localVehs);
           }
 
-          // Pull vehicles from cloud if local is empty
+          // Pull vehicles from cloud if cloud has more than local
           window.firebaseSync.listenVehicles(async cloudVehicles => {
-            if (cloudVehicles.length > 0 && window.store.getVehicles().length === 0) {
+            const localCount = window.store.getVehicles().length;
+            if (cloudVehicles.length > localCount) {
+              console.log('Cloud has', cloudVehicles.length, 'vehicles, local has', localCount, '— pulling from cloud');
+              await window.store.clearAll();
               await window.store.addVehicles(cloudVehicles);
             }
           });
@@ -311,6 +314,11 @@
     if (window.ui.bindSearch) window.ui.bindSearch();
     if (window.renderer) window.renderer.start();
     window.ui.refresh(window.store.getVehicles());
+
+    // On iPhone, default to Full List tab — more useful on small screens
+    if (window.innerWidth < 480) {
+      switchTab('list');
+    }
 
     // Wire list view
     if (window.listView) {

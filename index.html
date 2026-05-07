@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>EV Lot Monitor — 200 E. Marley Rd.</title>
   <meta name="description" content="Real-time EV charging lot monitor for the 2027 Chevy Bolt fleet at 200 E. Marley Rd., Kansas City, KS." />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
@@ -61,10 +61,10 @@
 
   <!-- Tab nav -->
   <nav class="tabs">
-    <button class="tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
-    <button class="tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
-    <button class="tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
-    <button class="tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
+    <button class="tab active" id="tab-3d"     onclick="switchTab('3d')"><span class="tab-long">🚗 3D Lot View</span><span class="tab-short">🚗 3D</span></button>
+    <button class="tab"        id="tab-add"    onclick="switchTab('add')"><span class="tab-long">+ Add Vehicle</span><span class="tab-short">+ Add</span></button>
+    <button class="tab"        id="tab-list"   onclick="switchTab('list')"><span class="tab-long">☰ Full List</span><span class="tab-short">☰ List</span></button>
+    <button class="tab"        id="tab-totals" onclick="switchTab('totals')"><span class="tab-long">📊 Daily Totals</span><span class="tab-short">📊 Totals</span></button>
   </nav>
 
   <!-- Main layout -->

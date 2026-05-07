@@ -22,7 +22,7 @@
 
   // ── View state ───────────────────────────────────────────────────────────────
   let angY          = 0.3;   // slight initial angle so lot has depth
-  let zoomLv        = 1.0;
+  let zoomLv        = window.innerWidth < 480 ? 2.5 : 1.0;
   let gph           = 0;
   let raf           = null;
   let dragActive    = false;

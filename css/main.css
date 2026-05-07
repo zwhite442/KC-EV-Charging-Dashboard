@@ -896,3 +896,116 @@ html, body {
   .list-table th:nth-child(6),
   .list-table td:nth-child(6) { display: none; } /* Hide kWh on phone */
 }
+
+/* ── iPhone / small phone responsive ── */
+@media (max-width: 480px) {
+
+  /* Topbar — compact for phone */
+  .topbar {
+    padding: 6px 10px;
+    height: auto;
+    gap: 4px;
+  }
+  .topbar-left { gap: 0; }
+  .topbar-title { font-size: 14px; }
+  .topbar-addr  { font-size: 9px; }
+  #sync-status  { font-size: 9px; }
+
+  /* Hide less important stat pills on phone */
+  #pill-avg, #pill-start { display: none; }
+  .stat-divider { display: none; }
+  .stat-pill { font-size: 10px; padding: 3px 7px; }
+
+  /* Tabs — scrollable horizontal row */
+  .tabs {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0;
+    padding: 0 8px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    font-size: 11px;
+    padding: 8px 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* 3D panel — smaller canvas, zoom in by default */
+  .panel-3d { min-height: 0; }
+
+  /* Rotate/zoom bars — bigger touch targets */
+  .rot-bar {
+    bottom: 70px;
+    padding: 8px 16px;
+    gap: 14px;
+  }
+  .rot-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+  }
+  .mode-btn {
+    font-size: 12px;
+    padding: 6px 14px;
+  }
+  .zoom-bar {
+    bottom: 70px;
+    right: 8px;
+    gap: 6px;
+  }
+  .zoom-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Add Vehicle form — full width fields */
+  .field-grid { grid-template-columns: 1fr !important; }
+  .charge-grid { grid-template-columns: 1fr 1fr !important; }
+  .totals-form-grid { grid-template-columns: 1fr 1fr !important; }
+  .method-card { padding: 12px; }
+  .method-title { font-size: 13px; }
+  .add-btn { font-size: 14px; padding: 14px; }
+
+  /* Full List — hide most columns, keep essentials */
+  .list-summary-bar { grid-template-columns: 1fr 1fr 1fr; }
+  .ls-cell:nth-child(n+4) { display: none; }
+  .list-table th:nth-child(2),
+  .list-table td:nth-child(2) { display: none; } /* VIN */
+  .list-table th:nth-child(3),
+  .list-table td:nth-child(3) { display: none; } /* Color */
+  .list-table th:nth-child(7),
+  .list-table td:nth-child(7) { display: none; } /* Pack */
+  .list-table th:nth-child(9),
+  .list-table td:nth-child(9) { display: none; } /* Date Added */
+  .list-table { font-size: 11px; }
+  .list-table td, .list-table th { padding: 8px 6px; }
+  .lv-spot { font-size: 12px; }
+
+  /* Daily Totals — stack cards */
+  .totals-summary { grid-template-columns: 1fr 1fr; }
+  .summary-val { font-size: 20px; }
+  .totals-table th, .totals-table td { padding: 8px 8px; font-size: 11px; }
+  .totals-top { flex-direction: column; gap: 8px; }
+  .totals-actions { flex-wrap: wrap; gap: 6px; }
+  .upload-btn { font-size: 11px; padding: 6px 10px; }
+
+  /* Safe area for iPhone notch/home bar */
+  .tabs { padding-bottom: env(safe-area-inset-bottom, 0); }
+  .rot-bar { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  .zoom-bar { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ── Tab short/long labels ── */
+.tab-short { display: none; }
+.tab-long  { display: inline; }
+
+@media (max-width: 480px) {
+  .tab-short { display: inline; }
+  .tab-long  { display: none; }
+}
