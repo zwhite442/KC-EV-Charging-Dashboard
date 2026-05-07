@@ -819,9 +819,9 @@ html, body {
 .sidebar-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-secondary);
   background: none;
@@ -832,9 +832,15 @@ html, body {
   text-align: left;
   width: 100%;
   transition: background .1s, color .1s;
+  letter-spacing: -.1px;
 }
 .sidebar-tab:hover  { background: var(--bg-elevated); color: var(--text-primary); }
-.sidebar-tab.active { background: rgba(56,139,253,.15); color: var(--accent); font-weight: 600; }
+.sidebar-tab.active {
+  background: rgba(56,139,253,.18);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .sidebar-section-label {
   font-size: 9px;
   font-weight: 700;
