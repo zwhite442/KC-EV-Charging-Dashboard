@@ -681,3 +681,65 @@ html, body {
   letter-spacing: .3px;
   transition: color .3s;
 }
+
+/* ── Daily Totals table column fixes ── */
+.totals-table { table-layout: fixed; width: 100%; }
+.totals-table th:nth-child(1), .totals-table td:nth-child(1) { width: 18%; }  /* Date */
+.totals-table th:nth-child(2), .totals-table td:nth-child(2) { width: 18%; text-align: right; } /* kWh's */
+.totals-table th:nth-child(3), .totals-table td:nth-child(3) { width: 14%; text-align: right; } /* Cars */
+.totals-table th:nth-child(4), .totals-table td:nth-child(4) { width: 18%; text-align: right; } /* Avg kWh */
+.totals-table th:nth-child(5), .totals-table td:nth-child(5) { width: 26%; } /* Notes */
+.totals-table th:nth-child(6), .totals-table td:nth-child(6) { width: 6%;  text-align: center; } /* Delete */
+.totals-table th:nth-child(2),
+.totals-table th:nth-child(3),
+.totals-table th:nth-child(4) { text-align: right; }
+
+/* ── Summary cards — equal width ── */
+.totals-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.summary-card { padding: 14px 16px; }
+.summary-val  { font-size: 26px; }
+
+/* ── List table column fixes ── */
+.list-table { table-layout: fixed; width: 100%; }
+.list-table th:nth-child(1), .list-table td:nth-child(1) { width: 10%; } /* Spot */
+.list-table th:nth-child(2), .list-table td:nth-child(2) { width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* VIN */
+.list-table th:nth-child(3), .list-table td:nth-child(3) { width: 16%; } /* Color */
+.list-table th:nth-child(4), .list-table td:nth-child(4) { width: 9%;  text-align: right; } /* Start % */
+.list-table th:nth-child(5), .list-table td:nth-child(5) { width: 9%;  text-align: right; } /* End % */
+.list-table th:nth-child(6), .list-table td:nth-child(6) { width: 11%; text-align: right; } /* kWh */
+.list-table th:nth-child(7), .list-table td:nth-child(7) { width: 8%;  text-align: right; } /* Pack */
+.list-table th:nth-child(8), .list-table td:nth-child(8) { width: 10%; } /* Status */
+.list-table th:nth-child(9), .list-table td:nth-child(9) { width: 5%;  text-align: center; } /* Menu */
+.list-table th:nth-child(4),
+.list-table th:nth-child(5),
+.list-table th:nth-child(6),
+.list-table th:nth-child(7) { text-align: right; }
+
+/* ── List summary bar ── */
+.list-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+.ls-cell {
+  padding: 8px 14px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ls-cell:last-child { border-right: none; }
+.ls-label { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); }
+.ls-val   { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.ls-ready    { color: #818cf8; }
+.ls-charging { color: #22c55e; }
+.ls-critical { color: #ef4444; }
+.ls-kwh      { color: #6ab0e8; }
