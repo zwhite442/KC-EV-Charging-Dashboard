@@ -57,11 +57,14 @@
     const q = filterQuery.toLowerCase().trim();
     if (!q) return vehicles;
     return vehicles.filter(v =>
-      (v.vin   || '').toLowerCase().includes(q) ||
-      (v.make  || '').toLowerCase().includes(q) ||
-      (v.model || '').toLowerCase().includes(q) ||
-      (v.color || '').toLowerCase().includes(q) ||
-      (v.year  || '').toString().includes(q)
+      (v.vin      || '').toLowerCase().includes(q) ||
+      (v.make     || '').toLowerCase().includes(q) ||
+      (v.model    || '').toLowerCase().includes(q) ||
+      (v.color    || '').toLowerCase().includes(q) ||
+      (v.location || '').toLowerCase().includes(q) ||
+      (v.year     || '').toString().includes(q) ||
+      String(v.startPct).includes(q) ||
+      String(v.endPct).includes(q)
     );
   }
 
@@ -300,11 +303,8 @@
     const input = document.getElementById('fleet-search');
     if (!input) return;
     input.addEventListener('input', e => {
-      filterQuery  = e.target.value;
-      filteredVehs = applyFilter(allVehicles);
-      // Reset virtual scroll
-      if (listEl) listEl.scrollTop = 0;
-      renderVisibleCards();
+      filterQuery = e.target.value;
+      buildSidebar(allVehicles);
     });
   }
 
