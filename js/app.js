@@ -246,34 +246,42 @@
   function init() {
     setupSidebarResize();
 
-    // Initialize Firebase immediately on page load
-    if (window.firebaseSync) {
-      window.firebaseSync.init().then(ok => {
-        if (!ok) return;
-        console.log('Firebase ready — syncing data');
+    // Initialize Firebase — small delay ensures all scripts are ready
+    setTimeout(() => {
+      if (window.firebaseSync) {
+        window.firebaseSync.init().then(ok => {
+          if (!ok) return;
+          console.log('Firebase ready — syncing data');
 
-        // Pull vehicles from cloud if local is empty
-        window.firebaseSync.listenVehicles(async cloudVehicles => {
-          if (cloudVehicles.length > 0 && window.store.getVehicles().length === 0) {
-            await window.store.addVehicles(cloudVehicles);
-          }
-        });
+          // Pull vehicles from cloud if local is empty
+          window.firebaseSync.listenVehicles(async cloudVehicles => {
+            if (cloudVehicles.length > 0 && window.store.getVehicles().length === 0) {
+              await window.store.addVehicles(cloudVehicles);
+            }
+          });
 
-        // Pull daily totals from cloud
-        window.firebaseSync.listenDailyTotals(async cloudTotals => {
-          if (cloudTotals.length > 0 && window.totalsStore) {
-            window.totalsStore.mergeFromCloud(cloudTotals);
-          }
+          // Pull daily totals from cloud
+          window.firebaseSync.listenDailyTotals(async cloudTotals => {
+            if (cloudTotals.length > 0 && window.totalsStore) {
+              window.totalsStore.mergeFromCloud(cloudTotals);
+            }
+          });
         });
-      });
-    }
+      } else {
+        console.error('firebaseSync not found — check script load order');
+      }
+    }, 500);
 
     window.store.on(vehicles => {
       window.ui.refresh(vehicles);
-      // Always refresh list view regardless of active tab
       if (window.listView) window.listView.refresh(vehicles);
       if (selectedIdx >= vehicles.length) closeDetail();
       else if (selectedIdx >= 0) window.ui.highlightCard(selectedIdx);
+
+      // Auto-save to Firebase whenever vehicles change
+      if (window.firebaseSync && window.firebaseSync.isReady() && vehicles.length > 0) {
+        window.firebaseSync.saveVehicles(vehicles);
+      }
 
       // Auto-save today's totals whenever vehicles change
       if (window.totalsStore && vehicles.length > 0) {
