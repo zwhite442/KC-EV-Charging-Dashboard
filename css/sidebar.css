@@ -133,3 +133,19 @@
 
 /* Virtual scroll spacers */
 .v-spacer { width: 100%; flex-shrink: 0; }
+
+/* ── Resizable sidebar ── */
+.sidebar { position: relative; min-width: 180px; max-width: 600px; }
+.sidebar-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background .15s;
+}
+.sidebar-resize:hover,
+.sidebar-resize.dragging { background: rgba(56,139,253,.4); }

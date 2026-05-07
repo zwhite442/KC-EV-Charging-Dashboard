@@ -59,15 +59,17 @@
 
   <!-- Tab nav -->
   <nav class="tabs">
-    <button class="tab active" id="tab-3d" onclick="switchTab('3d')">3D Lot View</button>
-    <button class="tab" id="tab-add" onclick="switchTab('add')">+ Add Vehicle</button>
+    <button class="tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
+    <button class="tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
+    <button class="tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
+    <button class="tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
   </nav>
 
   <!-- Main layout -->
   <div class="main">
 
     <!-- Sidebar vehicle list -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <span>Fleet</span>
         <span id="vehicle-count" class="vehicle-count">0</span>
@@ -78,22 +80,13 @@
       <div class="vehicle-list" id="vehicle-list">
         <div class="empty-state">Add vehicles to see them here</div>
       </div>
+      <div class="sidebar-resize" id="sidebar-resize" title="Drag to resize"></div>
     </aside>
 
     <!-- 3D Canvas panel -->
     <section class="panel-3d active" id="panel-3d">
       <canvas id="lot-canvas"></canvas>
 
-      <!-- Empty lot hint -->
-      <div class="drag-hint" id="drag-hint">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="2" y="22" width="36" height="15" rx="3" fill="#182538"/>
-          <rect x="2" y="3" width="36" height="18" rx="3" fill="#213045"/>
-          <path d="M12 13h16M20 7v12" stroke="#5a90c0" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-        <p>Add vehicles or load sample fleet</p>
-        <p class="hint-sub">Drag left/right to rotate · Scroll to zoom</p>
-      </div>
 
       <!-- Legend -->
       <div class="legend" id="legend">
@@ -267,25 +260,38 @@
     <!-- List View panel -->
     <section class="panel-list" id="panel-list" style="display:none">
       <div class="list-toolbar">
-        <input type="search" id="list-search" placeholder="Search VIN, spot, color…" class="list-search-input" />
-        <span class="list-count" id="list-count">0 vehicles</span>
+        <input type="search" id="list-search" placeholder="Search VIN, spot, color, section…" class="list-search-input" />
+        <div class="list-toolbar-right">
+          <span class="list-count" id="list-count">0 vehicles</span>
+          <button class="upload-btn" id="list-export-btn">⬇ Export CSV</button>
+        </div>
+      </div>
+      <div class="list-summary-bar" id="list-summary-bar">
+        <div class="ls-cell"><span class="ls-label">Total Vehicles</span><span class="ls-val" id="ls-total">0</span></div>
+        <div class="ls-cell"><span class="ls-label">Ready (≥30%)</span><span class="ls-val ls-ready" id="ls-ready">0</span></div>
+        <div class="ls-cell"><span class="ls-label">Charging</span><span class="ls-val ls-charging" id="ls-charging">0</span></div>
+        <div class="ls-cell"><span class="ls-label">Critical</span><span class="ls-val ls-critical" id="ls-critical">0</span></div>
+        <div class="ls-cell"><span class="ls-label">Total kWh</span><span class="ls-val ls-kwh" id="ls-kwh">0</span></div>
+        <div class="ls-cell"><span class="ls-label">Avg kWh/car</span><span class="ls-val" id="ls-avg-kwh">—</span></div>
+        <div class="ls-cell"><span class="ls-label">Avg Start %</span><span class="ls-val" id="ls-avg-start">—</span></div>
       </div>
       <div class="list-table-wrap">
         <table class="list-table" id="list-table">
           <thead>
             <tr>
-              <th>Spot</th>
-              <th>VIN</th>
-              <th>Color</th>
-              <th>Start %</th>
-              <th>End %</th>
-              <th>kWh</th>
-              <th>Status</th>
+              <th class="sortable" data-col="location">Spot ↕</th>
+              <th class="sortable" data-col="vin">VIN ↕</th>
+              <th class="sortable" data-col="color">Color ↕</th>
+              <th class="sortable" data-col="startPct">Start % ↕</th>
+              <th class="sortable" data-col="endPct">End % ↕</th>
+              <th class="sortable" data-col="kwh">kWh ↕</th>
+              <th class="sortable" data-col="batteryPack">Pack ↕</th>
+              <th class="sortable" data-col="status">Status ↕</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="list-tbody">
-            <tr class="empty-row"><td colspan="8">No vehicles yet</td></tr>
+            <tr class="empty-row"><td colspan="9">No vehicles yet — add vehicles or upload Excel</td></tr>
           </tbody>
         </table>
       </div>

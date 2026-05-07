@@ -180,8 +180,52 @@
     });
   }
 
+  // ── Sidebar resize ────────────────────────────────────────────────────────────
+  function setupSidebarResize() {
+    const sidebar = document.getElementById('sidebar');
+    const handle  = document.getElementById('sidebar-resize');
+    if (!sidebar || !handle) return;
+
+    // Restore saved width
+    try {
+      const saved = localStorage.getItem('ev_sidebar_w');
+      if (saved) sidebar.style.width = saved + 'px';
+    } catch {}
+
+    let dragging = false;
+    let startX = 0;
+    let startW = 0;
+
+    handle.addEventListener('mousedown', e => {
+      dragging = true;
+      startX   = e.clientX;
+      startW   = sidebar.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const newW = Math.max(180, Math.min(600, startW + (e.clientX - startX)));
+      sidebar.style.width = newW + 'px';
+      if (window.renderer) window.renderer.resize();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('ev_sidebar_w', sidebar.offsetWidth); } catch {}
+    });
+  }
+
   // ── Boot ──────────────────────────────────────────────────────────────────────
   function init() {
+    setupSidebarResize();
     window.store.on(vehicles => {
       window.ui.refresh(vehicles);
       if (window.listView) window.listView.refresh(vehicles);
