@@ -128,22 +128,31 @@
       renderSummary();
     }
 
-    // Start Firebase sync using onReady callback
-    if (window.firebaseSync) {
-      window.firebaseSync.init().then(ok => {
-        if (!ok) return;
-        window.firebaseSync.listenDailyTotals(async cloudTotals => {
-          if (!cloudTotals.length) return;
-          // Always use cloud data if it has more records
-          if (cloudTotals.length > totals.length || totals.length === 0) {
-            await idbClear();
-            for (const t of cloudTotals) await idbPut(t);
-            totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
-            renderTable();
-            renderSummary();
-          }
-        });
+    // Listen for Firebase daily totals (init called from app.js)
+    function startTotalsListener() {
+      if (!window.firebaseSync || !window.firebaseSync.isReady()) return;
+      window.firebaseSync.listenDailyTotals(async cloudTotals => {
+        if (!cloudTotals.length) return;
+        if (cloudTotals.length > totals.length || totals.length === 0) {
+          await idbClear();
+          for (const t of cloudTotals) await idbPut(t);
+          totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+          renderTable();
+          renderSummary();
+        }
       });
+    }
+
+    if (window.firebaseSync && window.firebaseSync.isReady()) {
+      startTotalsListener();
+    } else {
+      const check = setInterval(() => {
+        if (window.firebaseSync && window.firebaseSync.isReady()) {
+          clearInterval(check);
+          startTotalsListener();
+        }
+      }, 200);
+      setTimeout(() => clearInterval(check), 10000);
     }
   }
 
