@@ -113,7 +113,7 @@
     if (!ready) return;
     updateStatus('saving');
     try {
-      // Save count doc first so other devices know how many to fetch
+      // Save meta first
       await firestoreSet('meta', 'lotMeta', {
         count:     vehicles.length,
         updatedAt: new Date().toISOString(),
@@ -121,11 +121,15 @@
         year:      new Date().getFullYear(),
       });
 
-      // Save each vehicle as its own document
-      const saves = vehicles.map((v, i) =>
-        firestoreSet('vehicles', `v_${String(i).padStart(4,'0')}`, { ...v, _idx: i })
-      );
-      await Promise.all(saves);
+      // Save vehicles in batches of 10 to avoid timeouts
+      const BATCH = 10;
+      for (let i = 0; i < vehicles.length; i += BATCH) {
+        const chunk = vehicles.slice(i, i + BATCH);
+        await Promise.all(chunk.map((v, j) =>
+          firestoreSet('vehicles', `v_${String(i+j).padStart(4,'0')}`, { ...v, _idx: i+j })
+        ));
+      }
+
       updateStatus('online');
       console.log('✅ Saved', vehicles.length, 'vehicles to Firebase');
     } catch(err) {
