@@ -58,25 +58,24 @@
   </div>
 
   <!-- Tab nav -->
-  <nav class="tabs">
-    <button class="tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
-    <button class="tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
-    <button class="tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
-    <button class="tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
-  </nav>
+  <!-- Tabs moved into sidebar -->
 
   <!-- Main layout -->
   <div class="main">
 
-    <!-- Sidebar vehicle list -->
+    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <span>Fleet</span>
-        <span id="vehicle-count" class="vehicle-count">0</span>
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-title">EV Lot Monitor</span>
+        <span class="sidebar-fleet-count" id="vehicle-count">0</span>
       </div>
-      <div class="sidebar-search">
-        <input type="search" id="fleet-search" placeholder="Search VIN, make, color…" autocomplete="off" />
-      </div>
+      <nav class="sidebar-nav">
+        <button class="sidebar-tab active" id="tab-3d"     onclick="switchTab('3d')">🚗 3D Lot View</button>
+        <button class="sidebar-tab"        id="tab-add"    onclick="switchTab('add')">+ Add Vehicle</button>
+        <button class="sidebar-tab"        id="tab-list"   onclick="switchTab('list')">☰ Full List</button>
+        <button class="sidebar-tab"        id="tab-totals" onclick="switchTab('totals')">📊 Daily Totals</button>
+      </nav>
+      <div class="sidebar-section-label">Fleet</div>
       <div class="vehicle-list" id="vehicle-list">
         <div class="empty-state">Add vehicles to see them here</div>
       </div>
