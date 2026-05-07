@@ -83,9 +83,14 @@
     const countEl = document.getElementById('list-count');
     if (!tbody) return;
 
-    updateSummaryBar(vehicles);
+    // Always pull from store directly so inputDate and all fields are current
+    const vehs = (window.store && window.store.getVehicles().length > 0)
+      ? window.store.getVehicles()
+      : (vehicles || []);
 
-    const filtered = filterAndSort(vehicles);
+    updateSummaryBar(vehs);
+
+    const filtered = filterAndSort(vehs);
     if (countEl) countEl.textContent = `${filtered.length.toLocaleString()} vehicle${filtered.length!==1?'s':''}`;
 
     document.querySelectorAll('.list-table th.sortable').forEach(th => {
@@ -102,7 +107,7 @@
 
     const frag = document.createDocumentFragment();
     filtered.forEach(v => {
-      const realIdx = vehicles.indexOf(v);
+      const realIdx = vehs.indexOf(v);
       const pal     = window.EV_COLORS.getPalette(v.color);
       const sc      = v.endPct>=30?'#818cf8':v.endPct<10?'#ef4444':'#22c55e';
       const status  = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
@@ -279,10 +284,8 @@
   }
 
   function refresh(vehicles) {
-    // Always use passed vehicles, but fall back to store if empty
-    const vehs = (vehicles && vehicles.length > 0)
-      ? vehicles
-      : (window.store ? window.store.getVehicles() : []);
+    // Always pull directly from store to guarantee freshest data including inputDate
+    const vehs = window.store ? window.store.getVehicles() : (vehicles || []);
     buildList(vehs);
     buildTooltips(vehs);
   }
