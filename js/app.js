@@ -245,6 +245,29 @@
   // ── Boot ──────────────────────────────────────────────────────────────────────
   function init() {
     setupSidebarResize();
+
+    // Initialize Firebase immediately on page load
+    if (window.firebaseSync) {
+      window.firebaseSync.init().then(ok => {
+        if (!ok) return;
+        console.log('Firebase ready — syncing data');
+
+        // Pull vehicles from cloud if local is empty
+        window.firebaseSync.listenVehicles(async cloudVehicles => {
+          if (cloudVehicles.length > 0 && window.store.getVehicles().length === 0) {
+            await window.store.addVehicles(cloudVehicles);
+          }
+        });
+
+        // Pull daily totals from cloud
+        window.firebaseSync.listenDailyTotals(async cloudTotals => {
+          if (cloudTotals.length > 0 && window.totalsStore) {
+            window.totalsStore.mergeFromCloud(cloudTotals);
+          }
+        });
+      });
+    }
+
     window.store.on(vehicles => {
       window.ui.refresh(vehicles);
       // Always refresh list view regardless of active tab
