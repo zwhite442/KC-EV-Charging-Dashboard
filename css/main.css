@@ -748,3 +748,22 @@ html, body {
 .lv-date { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
 .list-table th:nth-child(9), .list-table td:nth-child(9) { width: 11%; white-space: nowrap; } /* Date Added */
 .list-table th:nth-child(10), .list-table td:nth-child(10) { width: 5%; text-align: center; } /* Menu */
+
+/* ── List table column resize handles ── */
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+  transition: background .15s;
+}
+.col-resize-handle:hover,
+.col-resize-handle.dragging {
+  background: rgba(56,139,253,.5);
+}
+/* Keep table fixed so column widths are respected */
+.list-table { table-layout: fixed; }

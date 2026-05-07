@@ -335,6 +335,86 @@
     if(overlay)    overlay.addEventListener('click', e=>{ if(e.target===overlay) closeEdit(); });
 
     initTooltips();
+    initColResize();
+  }
+
+  // ── Column resize ─────────────────────────────────────────────────────────────
+  function initColResize() {
+    const table = document.getElementById('list-table');
+    if (!table) return;
+
+    // Load saved widths
+    try {
+      const saved = JSON.parse(localStorage.getItem('ev_list_col_widths') || '{}');
+      Object.entries(saved).forEach(([col, w]) => {
+        const th = table.querySelector(`th[data-col="${col}"]`);
+        if (th) th.style.width = w + 'px';
+      });
+    } catch {}
+
+    // Add resize handles to each sortable th
+    table.querySelectorAll('th').forEach((th, idx) => {
+      // Skip last th (menu button column)
+      if (idx === table.querySelectorAll('th').length - 1) return;
+
+      const handle = document.createElement('div');
+      handle.className = 'col-resize-handle';
+      handle.title = 'Drag to resize column';
+      th.style.position = 'relative';
+      th.appendChild(handle);
+
+      let startX = 0;
+      let startW = 0;
+      let dragging = false;
+
+      handle.addEventListener('mousedown', e => {
+        e.stopPropagation(); // don't trigger sort
+        dragging  = true;
+        startX    = e.clientX;
+        startW    = th.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.cursor    = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        const newW = Math.max(60, startW + (e.clientX - startX));
+        th.style.width = newW + 'px';
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        document.body.style.cursor     = '';
+        document.body.style.userSelect = '';
+        // Save widths to localStorage
+        try {
+          const saved = JSON.parse(localStorage.getItem('ev_list_col_widths') || '{}');
+          const col = th.dataset.col || idx;
+          saved[col] = th.offsetWidth;
+          localStorage.setItem('ev_list_col_widths', JSON.stringify(saved));
+        } catch {}
+      });
+
+      // Touch support
+      handle.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        startW = th.offsetWidth;
+        dragging = true;
+        e.preventDefault();
+      }, { passive: false });
+
+      handle.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const newW = Math.max(60, startW + (e.touches[0].clientX - startX));
+        th.style.width = newW + 'px';
+      }, { passive: true });
+
+      handle.addEventListener('touchend', () => { dragging = false; });
+    });
   }
 
   window.listView = { refresh, buildList, buildTooltips, bindEvents };
