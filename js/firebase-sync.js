@@ -1,16 +1,9 @@
 /**
  * firebase-sync.js
- * Real-time cross-device sync using Firebase Firestore.
- * Syncs: vehicles (monthly lot) and daily totals (permanent).
- *
- * Collections:
- *   /vehicles/{id}     — current month's lot vehicles
- *   /daily_totals/{dateKey} — permanent daily totals history
- *   /meta/lotMeta      — monthly reset tracking
+ * Firebase scripts are loaded in index.html — this just initializes and uses them.
  */
 
 (function () {
-  // ── Firebase config (kc-ev-charging-dashboard) ────────────────────────────────
   const FIREBASE_CONFIG = {
     apiKey:            "AIzaSyCyAU39lEVEGCmiGKiirop1O1QFK0V0hzI",
     authDomain:        "kc-ev-charging-dashboard.firebaseapp.com",
@@ -20,197 +13,137 @@
     appId:             "1:883706784039:web:089dbe02ad7e851c07e102",
   };
 
-  // ── State ─────────────────────────────────────────────────────────────────────
-  let db          = null;
-  let initialized = false;
-  let syncStatus  = 'connecting'; // connecting | online | offline | error
-  const listeners = [];
+  let db    = null;
+  let ready = false;
 
-  // ── Load Firebase SDK dynamically ────────────────────────────────────────────
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = src; s.type = 'module';
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    });
+  function updateStatus(status) {
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    const map = {
+      connecting: ['⟳', '#f59e0b', 'Connecting…'],
+      online:     ['●', '#22c55e', 'Synced'],
+      offline:    ['○', '#6b7280', 'Offline'],
+      error:      ['!', '#ef4444', 'Sync error'],
+    };
+    const [dot, color, text] = map[status] || map.offline;
+    el.innerHTML = `<span style="color:${color}">${dot}</span> ${text}`;
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────────
   async function init() {
     try {
       updateStatus('connecting');
 
-      // Load Firebase via CDN (compat version works without bundler)
-      await Promise.all([
-        loadFirebaseCompat('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js'),
-        loadFirebaseCompat('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'),
-      ]);
+      // Firebase scripts are already loaded via <script> tags in index.html
+      if (typeof firebase === 'undefined') {
+        console.error('Firebase SDK not loaded');
+        updateStatus('error');
+        return false;
+      }
 
       if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
       }
+
       db = firebase.firestore();
 
-      // Enable offline persistence so it works even without internet
-      await db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-        if (err.code === 'failed-precondition') {
-          console.warn('Firebase: multiple tabs open, persistence in one tab only');
-        } else if (err.code === 'unimplemented') {
-          console.warn('Firebase: offline persistence not supported in this browser');
-        }
-      });
+      // Enable offline persistence
+      try {
+        await db.enablePersistence({ synchronizeTabs: true });
+      } catch(e) {
+        // ok — multiple tabs or not supported
+      }
 
-      initialized = true;
+      ready = true;
       updateStatus('online');
-      console.log('✅ Firebase Firestore connected');
+      console.log('✅ Firebase Firestore ready');
       return true;
-    } catch (err) {
+    } catch(err) {
       console.error('Firebase init failed:', err);
       updateStatus('error');
       return false;
     }
   }
 
-  function loadFirebaseCompat(src) {
-    return new Promise((resolve, reject) => {
-      // Check if already loaded
-      if (src.includes('firebase-app') && typeof firebase !== 'undefined') { resolve(); return; }
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  // ── Status indicator ──────────────────────────────────────────────────────────
-  function updateStatus(status) {
-    syncStatus = status;
-    const el = document.getElementById('sync-status');
-    if (!el) return;
-    const configs = {
-      connecting: { dot: '⟳', text: 'Connecting…', color: '#f59e0b' },
-      online:     { dot: '●', text: 'Synced',       color: '#22c55e' },
-      offline:    { dot: '○', text: 'Offline',       color: '#6b7280' },
-      error:      { dot: '!', text: 'Sync error',    color: '#ef4444' },
-    };
-    const cfg = configs[status] || configs.offline;
-    el.innerHTML = `<span style="color:${cfg.color}">${cfg.dot}</span> ${cfg.text}`;
-    el.title = status === 'online' ? 'All data synced to cloud' :
-               status === 'offline' ? 'Working offline — will sync when reconnected' :
-               'Could not connect to cloud sync';
-  }
-
   // ── Vehicles ──────────────────────────────────────────────────────────────────
-  // Save all vehicles (full replace — called after any change to the lot)
   async function saveVehicles(vehicles) {
-    if (!initialized || !db) return;
+    if (!ready || !db) return;
     try {
       const batch = db.batch();
       const col   = db.collection('vehicles');
 
-      // Delete all existing docs first
-      const existing = await col.get();
-      existing.docs.forEach(doc => batch.delete(doc.ref));
+      const snap = await col.get();
+      snap.docs.forEach(doc => batch.delete(doc.ref));
 
-      // Add current vehicles
       vehicles.forEach((v, i) => {
-        const ref = col.doc(`v_${i}`);
-        batch.set(ref, { ...v, _idx: i });
+        const clean = {};
+        Object.keys(v).forEach(k => {
+          if (v[k] !== undefined) clean[k] = v[k];
+        });
+        batch.set(col.doc('v_' + String(i).padStart(4, '0')), { ...clean, _idx: i });
       });
 
-      // Save meta (month stamp)
-      const now = new Date();
       batch.set(db.collection('meta').doc('lotMeta'), {
-        month: now.getMonth(),
-        year:  now.getFullYear(),
+        month:     new Date().getMonth(),
+        year:      new Date().getFullYear(),
+        count:     vehicles.length,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
 
       await batch.commit();
       updateStatus('online');
-    } catch (err) {
-      console.error('Firebase saveVehicles error:', err);
+      console.log('✅ Saved', vehicles.length, 'vehicles to Firebase');
+    } catch(err) {
+      console.error('saveVehicles error:', err);
       updateStatus('error');
     }
   }
 
-  // Listen for vehicle changes from other devices
   function listenVehicles(onUpdate) {
-    if (!initialized || !db) return;
-    db.collection('vehicles').orderBy('_idx').onSnapshot(snapshot => {
-      const vehicles = snapshot.docs.map(doc => {
-        const d = doc.data();
-        delete d._idx;
-        return d;
+    if (!ready || !db) return;
+    db.collection('vehicles').orderBy('_idx').onSnapshot(snap => {
+      const vehs = snap.docs.map(d => {
+        const v = { ...d.data() };
+        delete v._idx;
+        return v;
       });
-      onUpdate(vehicles);
+      onUpdate(vehs);
       updateStatus('online');
     }, err => {
-      console.error('Firebase vehicles listener error:', err);
+      console.error('listenVehicles error:', err);
       updateStatus('offline');
     });
   }
 
   // ── Daily Totals ──────────────────────────────────────────────────────────────
   async function saveDailyTotal(record) {
-    if (!initialized || !db) return;
+    if (!ready || !db) return;
     try {
       await db.collection('daily_totals').doc(record.dateKey).set(record);
       updateStatus('online');
-    } catch (err) {
-      console.error('Firebase saveDailyTotal error:', err);
+      console.log('✅ Saved daily total:', record.dateKey);
+    } catch(err) {
+      console.error('saveDailyTotal error:', err);
       updateStatus('error');
     }
   }
 
   async function deleteDailyTotal(dateKey) {
-    if (!initialized || !db) return;
+    if (!ready || !db) return;
     try {
       await db.collection('daily_totals').doc(dateKey).delete();
-    } catch (err) {
-      console.error('Firebase deleteDailyTotal error:', err);
+    } catch(err) {
+      console.error('deleteDailyTotal error:', err);
     }
   }
 
   function listenDailyTotals(onUpdate) {
-    if (!initialized || !db) return;
-    db.collection('daily_totals').orderBy('dateKey', 'desc').onSnapshot(snapshot => {
-      const totals = snapshot.docs.map(doc => doc.data());
+    if (!ready || !db) return;
+    db.collection('daily_totals').orderBy('dateKey', 'desc').onSnapshot(snap => {
+      const totals = snap.docs.map(d => d.data());
       onUpdate(totals);
     }, err => {
-      console.error('Firebase totals listener error:', err);
-      updateStatus('offline');
+      console.error('listenDailyTotals error:', err);
     });
-  }
-
-  // ── Monthly reset check ───────────────────────────────────────────────────────
-  async function checkMonthlyReset() {
-    if (!initialized || !db) return false;
-    try {
-      const meta = await db.collection('meta').doc('lotMeta').get();
-      if (!meta.exists) return false;
-      const { month, year } = meta.data();
-      const now = new Date();
-      if (year !== now.getFullYear() || month !== now.getMonth()) {
-        // New month — clear vehicles in Firestore
-        const batch   = db.batch();
-        const existing = await db.collection('vehicles').get();
-        existing.docs.forEach(doc => batch.delete(doc.ref));
-        batch.set(db.collection('meta').doc('lotMeta'), {
-          month: now.getMonth(),
-          year:  now.getFullYear(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        await batch.commit();
-        return true; // was reset
-      }
-      return false;
-    } catch (err) {
-      console.error('Firebase monthly reset check error:', err);
-      return false;
-    }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
@@ -221,8 +154,6 @@
     saveDailyTotal,
     deleteDailyTotal,
     listenDailyTotals,
-    checkMonthlyReset,
-    isReady: () => initialized,
-    getStatus: () => syncStatus,
+    isReady: () => ready,
   };
 })();

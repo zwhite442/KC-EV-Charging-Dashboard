@@ -235,12 +235,12 @@
     if (window.firebaseSync) {
       window.firebaseSync.init().then(ok => {
         if (!ok) return;
+        // Use onReady to ensure DB is available before listening
         window.firebaseSync.listenVehicles(async cloudVehicles => {
-          if (!cloudVehicles.length) return;
-          // Pull from cloud if local is empty OR cloud has more vehicles
-          if (cloudVehicles.length > vehicles.length || vehicles.length === 0) {
+          // Pull from cloud if it has data and local is empty
+          if (cloudVehicles.length > 0 && vehicles.length === 0) {
             await idbClear();
-            await idbAddMany(cloudVehicles);
+            await idbAddMany(cloudVehicles.map(v => ({...v})));
             vehicles = await idbGetAll();
             vehicles = vehicles.map(v => ({ ...v, kwh: autoKwh(v.startPct, v.endPct, v.batteryPack) }));
             emit();

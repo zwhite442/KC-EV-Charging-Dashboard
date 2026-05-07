@@ -111,36 +111,39 @@
     renderTable();
     renderSummary();
 
-    // Start Firebase sync — wait for it to be ready if not yet
-    function startFirebaseSync() {
-      if (!window.firebaseSync) return;
-      window.firebaseSync.listenDailyTotals(async cloudTotals => {
-        if (!cloudTotals.length) return;
-        // Always merge cloud data — replace local with cloud if cloud has more
-        if (cloudTotals.length > totals.length || totals.length === 0) {
-          await idbClear();
-          for (const t of cloudTotals) await idbPut(t);
-          totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
-          renderTable();
-          renderSummary();
-        }
-      });
+    // Seed historical data if empty
+    if (totals.length === 0) {
+      const historical = [
+        { date: '2026-05-01', kwh: 202,  cars: 39, notes: '' },
+        { date: '2026-05-02', kwh: 139,  cars: 28, notes: '' },
+        { date: '2026-05-05', kwh: 0,    cars: 0,  notes: '' },
+        { date: '2026-05-06', kwh: 222,  cars: 43, notes: '' },
+      ];
+      for (const r of historical) {
+        const clean = sanitize(r);
+        if (clean) { await idbPut(clean); totals.push(clean); }
+      }
+      totals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+      renderTable();
+      renderSummary();
     }
 
-    if (window.firebaseSync && window.firebaseSync.isReady()) {
-      startFirebaseSync();
-    } else {
-      // Wait up to 5 seconds for Firebase to initialize
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        if (window.firebaseSync && window.firebaseSync.isReady()) {
-          clearInterval(interval);
-          startFirebaseSync();
-        } else if (attempts > 50) {
-          clearInterval(interval); // give up after 5s
-        }
-      }, 100);
+    // Start Firebase sync using onReady callback
+    if (window.firebaseSync) {
+      window.firebaseSync.init().then(ok => {
+        if (!ok) return;
+        window.firebaseSync.listenDailyTotals(async cloudTotals => {
+          if (!cloudTotals.length) return;
+          // Always use cloud data if it has more records
+          if (cloudTotals.length > totals.length || totals.length === 0) {
+            await idbClear();
+            for (const t of cloudTotals) await idbPut(t);
+            totals = cloudTotals.sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+            renderTable();
+            renderSummary();
+          }
+        });
+      });
     }
   }
 
@@ -312,26 +315,27 @@
   // ── Wire up DOM events ────────────────────────────────────────────────────────
   function bindEvents() {
     // Manual add
+    // Set default date to today
+    const dateInput = document.getElementById('t-date');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+
+    // Save day button — wired directly
     const addBtn = document.getElementById('t-add-btn');
     if (addBtn) {
-      // Default date to today
-      const dateInput = document.getElementById('t-date');
-      if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().slice(0, 10);
-      }
-      addBtn.addEventListener('click', () => {
+      addBtn.onclick = async function() {
         const date  = document.getElementById('t-date').value;
-        const kwh   = document.getElementById('t-kwh').value;
-        const cars  = document.getElementById('t-cars').value;
-        const notes = document.getElementById('t-notes').value;
-        if (!date) { alert('Please enter a date.'); return; }
-        upsert({ date, kwh, cars, notes }).then(() => {
-          document.getElementById('t-kwh').value   = '';
-          document.getElementById('t-cars').value  = '';
-          document.getElementById('t-notes').value = '';
-          document.getElementById('t-date').value  = new Date().toISOString().slice(0,10);
-        });
-      });
+        const kwh   = parseFloat(document.getElementById('t-kwh').value) || 0;
+        const cars  = parseInt(document.getElementById('t-cars').value)  || 0;
+        const notes = document.getElementById('t-notes').value || '';
+        if (!date) { alert('Please pick a date first.'); return; }
+        await upsert({ date, kwh, cars, notes });
+        document.getElementById('t-kwh').value   = '';
+        document.getElementById('t-cars').value  = '';
+        document.getElementById('t-notes').value = '';
+        document.getElementById('t-date').value  = new Date().toISOString().slice(0,10);
+      };
     }
 
     // File import
