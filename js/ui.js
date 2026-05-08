@@ -18,26 +18,23 @@
   let filterQuery   = '';
 
   // ── Stat pills ────────────────────────────────────────────────────────────────
-  // All values auto-calculated from vehicle data — no manual input needed
   function updateStats(vehicles) {
     let ready = 0, charging = 0, critical = 0;
     let totalKwh = 0, totalStart = 0, count = vehicles.length;
 
     vehicles.forEach(v => {
-      // Status based on endPct (charged/target state)
       if (v.endPct >= 30)      ready++;
       else if (v.endPct < 10)  critical++;
       else                     charging++;
 
-      // Auto-accumulate kWh and starting SOC
       const pack = v.batteryPack || 0.66;
       const kwh  = window.EV_COLORS.calcKwh(v.startPct, v.endPct, pack);
       totalKwh  += kwh;
       totalStart += (v.startPct || 0);
     });
 
-    const avgKwh  = count > 0 ? Math.round((totalKwh / count) * 10) / 10 : 0;
-    const avgStart = count > 0 ? Math.round((totalStart / count) * 100) / 100 : 0;
+    const avgKwh        = count > 0 ? Math.round((totalKwh / count) * 10) / 10 : 0;
+    const avgStart      = count > 0 ? Math.round((totalStart / count) * 100) / 100 : 0;
     const totalKwhRounded = Math.round(totalKwh * 10) / 10;
 
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -69,7 +66,6 @@
   }
 
   // ── Virtual-scroll sidebar ────────────────────────────────────────────────────
-  // Renders only the visible slice of cards — handles unlimited entries smoothly.
   let listEl       = null;
   let spacerTop    = null;
   let spacerBottom = null;
@@ -77,10 +73,21 @@
 
   function ensureVirtualDOM() {
     listEl = document.getElementById('vehicle-list');
-    if (listEl._virtualSetup) return;
+    // FIX: guard null — element may not exist if sidebar is hidden at boot
+    if (!listEl) {
+      console.warn('[EV] ensureVirtualDOM: #vehicle-list not in DOM yet');
+      return;
+    }
+    if (listEl._virtualSetup) {
+      // Already initialised — re-validate spacer refs in case innerHTML was wiped
+      spacerTop    = listEl.querySelector('.v-spacer:first-child');
+      spacerBottom = listEl.querySelector('.v-spacer:last-child');
+      if (spacerTop && spacerBottom) return;
+      // Spacers were wiped — fall through and rebuild
+      listEl._virtualSetup = false;
+    }
     listEl._virtualSetup = true;
 
-    // Clear and insert sentinel spacers
     listEl.innerHTML = '';
     spacerTop    = document.createElement('div');
     spacerBottom = document.createElement('div');
@@ -96,7 +103,8 @@
   }
 
   function renderVisibleCards() {
-    if (!listEl) return;
+    // FIX: guard null spacers — crash when setup ran before element was ready
+    if (!listEl || !spacerTop || !spacerBottom) return;
     const viewH    = listEl.clientHeight;
     const scrollY  = listEl.scrollTop;
     const total    = filteredVehs.length;
@@ -106,7 +114,6 @@
     spacerTop.style.height    = (startIdx * CARD_HEIGHT) + 'px';
     spacerBottom.style.height = ((total - endIdx) * CARD_HEIGHT) + 'px';
 
-    // Remove old cards (between spacers)
     const existing = listEl.querySelectorAll('.vehicle-card');
     existing.forEach(el => el.remove());
 
@@ -114,16 +121,14 @@
     for (let i = startIdx; i < endIdx; i++) {
       frag.appendChild(makeCard(filteredVehs[i], i));
     }
-    // Insert before bottom spacer
     listEl.insertBefore(frag, spacerBottom);
   }
 
   function makeCard(v, localIdx) {
-    // localIdx is position in filteredVehs; we need real index for selectVehicle
     const realIdx = allVehicles.indexOf(v);
     const pal  = window.EV_COLORS.getPalette(v.color);
     const sc   = v.endPct >= 30 ? '#818cf8' : v.endPct < 10 ? '#ef4444' : '#22c55e';
-    const pct  = Math.round(v.endPct);   // show ending/charged SOC
+    const pct  = Math.round(v.endPct);
     const card = document.createElement('div');
     card.className = 'vehicle-card';
     card.style.height = CARD_HEIGHT + 'px';
@@ -154,24 +159,23 @@
     filteredVehs = applyFilter(vehicles);
 
     ensureVirtualDOM();
+    // FIX: bail if element still not in DOM — will retry on next refresh
+    if (!listEl) return;
 
     if (!vehicles.length) {
       listEl.innerHTML = '<div class="empty-state">Add vehicles to see them here</div>';
       return;
     }
 
-    // Reset scroll, re-render
     listEl.scrollTop = 0;
     renderVisibleCards();
   }
 
-  // ── Entry list in form panel (paginated — show last 200 for perf) ─────────────
+  // ── Entry list in form panel ──────────────────────────────────────────────────
   function buildEntryList(vehicles) {
-    const list  = document.getElementById('entry-list');
+    const list = document.getElementById('entry-list');
     list.innerHTML = '';
 
-    // Show at most 200 most-recent entries in the form list
-    // (the lot view always shows all)
     const slice = vehicles.slice(-200).reverse();
     if (vehicles.length > 200) {
       const note = document.createElement('div');
@@ -213,19 +217,19 @@
     document.getElementById('detail-color').textContent   = label;
     document.getElementById('detail-mileage').textContent = v.location || '—';
     document.getElementById('detail-rate').textContent    = v.rate   ? v.rate + ' kW/h' : '—';
-    const packPct = v.batteryPack ? Math.round(v.batteryPack * 100) + '%' : '66%';
+    const packPct  = v.batteryPack ? Math.round(v.batteryPack * 100) + '%' : '66%';
     const capacity = v.batteryPack ? Math.round(65 * v.batteryPack * 10) / 10 : 42.9;
-    document.getElementById('detail-kwh').textContent     = v.kwh !== undefined
+    document.getElementById('detail-kwh').textContent = v.kwh !== undefined
       ? `${v.kwh} kWh (${capacity} kWh cap · pack ${packPct})`
       : '—';
 
     const s  = Math.round(v.startPct);
     const en = Math.round(v.endPct);
-    document.getElementById('detail-pct').textContent    = `${s}% → ${en}%`;
-    document.getElementById('detail-bar').style.width    = s + '%';
+    document.getElementById('detail-pct').textContent      = `${s}% → ${en}%`;
+    document.getElementById('detail-bar').style.width      = s + '%';
     document.getElementById('detail-bar').style.background = sc;
-    document.getElementById('detail-start').textContent  = s  + '%';
-    document.getElementById('detail-end').textContent    = en + '%';
+    document.getElementById('detail-start').textContent    = s  + '%';
+    document.getElementById('detail-end').textContent      = en + '%';
 
     document.getElementById('detail-card').classList.add('visible');
   }
@@ -249,28 +253,21 @@
     badge.classList.toggle('visible', count > 0);
   }
 
-  // ── Overlays ─────────────────────────────────────────────────────────────────
+  // ── Overlays ──────────────────────────────────────────────────────────────────
   function updateOverlays(count) {
     const set = (id, visible) => {
       const el = document.getElementById(id);
       if (!el) return;
-      if (visible) {
-        el.classList.add('visible');
-        el.style.display = '';
-      } else {
-        el.classList.remove('visible');
-        el.style.display = 'none';
-      }
+      if (visible) { el.classList.add('visible'); el.style.display = ''; }
+      else         { el.classList.remove('visible'); el.style.display = 'none'; }
     };
     set('legend',   count > 0);
     set('rot-bar',  count > 0);
     set('zoom-bar', count > 0);
-    // Always show controls even with 0 vehicles so pan toggle is accessible
-    const rotBar = document.getElementById('rot-bar');
-    if (rotBar) { rotBar.classList.add('visible'); rotBar.style.display = 'flex'; }
+    const rotBar  = document.getElementById('rot-bar');
+    if (rotBar)  { rotBar.classList.add('visible');  rotBar.style.display  = 'flex'; }
     const zoomBar = document.getElementById('zoom-bar');
     if (zoomBar) { zoomBar.classList.add('visible'); zoomBar.style.display = 'flex'; }
-    // Drag hint only when no vehicles
     const hint = document.getElementById('drag-hint');
     if (hint) hint.classList.toggle('hidden', count > 0);
   }
@@ -282,11 +279,11 @@
     });
   }
 
-  // ── kWh auto-preview in form ──────────────────────────────────────────────────
+  // ── kWh preview ──────────────────────────────────────────────────────────────
   function updatePreview() {
     const s  = parseFloat(document.getElementById('f-start').value) || 0;
     const e  = parseFloat(document.getElementById('f-end').value)   || 0;
-    const sc = e >= 30 ? '#818cf8' : e < 10 ? '#ef4444' : '#22c55e'; // color based on target (end) SOC
+    const sc = e >= 30 ? '#818cf8' : e < 10 ? '#ef4444' : '#22c55e';
 
     const bar = document.getElementById('preview-bar');
     const pct = document.getElementById('preview-pct');
@@ -304,7 +301,6 @@
     if (!input) return;
     input.addEventListener('input', e => {
       filterQuery = e.target.value;
-      // Always pull freshest data from store
       const vehs = window.store ? window.store.getVehicles() : allVehicles;
       buildSidebar(vehs);
     });

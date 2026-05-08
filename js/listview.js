@@ -13,11 +13,11 @@
     midnight:'Midnight Blue', green:'Cacti Green',
   };
 
-  let ctxIdx    = -1;
-  let editIdx   = -1;
-  let query     = '';
-  let sortCol   = 'location';
-  let sortAsc   = true;
+  let ctxIdx  = -1;
+  let editIdx = -1;
+  let query   = '';
+  let sortCol = 'location';
+  let sortAsc = true;
 
   function updateSummaryBar(vehicles) {
     let ready=0, charging=0, critical=0, totalKwh=0, totalStart=0;
@@ -83,7 +83,6 @@
     const countEl = document.getElementById('list-count');
     if (!tbody) return;
 
-    // Always pull from store directly so inputDate and all fields are current
     const vehs = (window.store && window.store.getVehicles().length > 0)
       ? window.store.getVehicles()
       : (vehicles || []);
@@ -101,7 +100,7 @@
 
     tbody.innerHTML = '';
     if (!filtered.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${vehicles.length?'No vehicles match search':'No vehicles yet — paste from Excel or upload a file'}</td></tr>`.replace('colspan="9"','colspan="10"');
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="10">${vehicles.length?'No vehicles match search':'No vehicles yet — paste from Excel or upload a file'}</td></tr>`;
       return;
     }
 
@@ -128,7 +127,20 @@
         <td class="lv-date">${v.inputDate ? new Date(v.inputDate).toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'}) : '—'}</td>
         <td><button class="lv-menu-btn" data-idx="${realIdx}" title="Options">⋯</button></td>
       `;
+
+      // Desktop right-click
       tr.addEventListener('contextmenu', e => { e.preventDefault(); showCtx(e.clientX, e.clientY, realIdx); });
+
+      // FIX: iPad long-press — passive touchstart timer, won't freeze touch pipeline
+      let _lp = null;
+      tr.addEventListener('touchstart', e => {
+        const t = e.touches[0];
+        _lp = setTimeout(() => { _lp = null; showCtx(t.clientX, t.clientY, realIdx); }, 500);
+      }, { passive: true });
+      tr.addEventListener('touchend',    () => { clearTimeout(_lp); _lp = null; }, { passive: true });
+      tr.addEventListener('touchmove',   () => { clearTimeout(_lp); _lp = null; }, { passive: true });
+      tr.addEventListener('touchcancel', () => { clearTimeout(_lp); _lp = null; }, { passive: true });
+
       tr.querySelector('.lv-menu-btn').addEventListener('click', e => {
         e.stopPropagation();
         const r = e.currentTarget.getBoundingClientRect();
@@ -143,14 +155,19 @@
     ctxIdx = idx;
     const menu = document.getElementById('ctx-menu');
     if (!menu) return;
-    menu.style.display = 'block';
-    menu.style.left = Math.min(x, window.innerWidth-165)+'px';
-    menu.style.top  = Math.min(y, window.innerHeight-125)+'px';
+    // FIX: defer via setTimeout(0) so this runs after the touch/contextmenu event
+    // exits the browser's input pipeline — prevents iPadOS UI freeze
+    setTimeout(() => {
+      menu.style.display = 'block';
+      menu.style.left = Math.min(x, window.innerWidth  - 165) + 'px';
+      menu.style.top  = Math.min(y, window.innerHeight - 125) + 'px';
+    }, 0);
   }
+
   function hideCtx() {
-    const m=document.getElementById('ctx-menu');
-    if(m) m.style.display='none';
-    ctxIdx=-1;
+    const m = document.getElementById('ctx-menu');
+    if (m) m.style.display = 'none';
+    ctxIdx = -1;
   }
 
   function openEdit(idx) {
@@ -205,8 +222,8 @@
     if (!vehs.length) { alert('No vehicles to export.'); return; }
     const header = 'Spot,VIN,Color,Start %,End %,kWh Delivered,Battery Pack,Status,Date Added\n';
     const rows = vehs.map(v => {
-      const kwh    = window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
-      const status = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
+      const kwh     = window.EV_COLORS.calcKwh(v.startPct, v.endPct, v.batteryPack||0.66);
+      const status  = v.endPct>=30?'Ready':v.endPct<10?'Critical':'Charging';
       const dateAdded = v.inputDate ? new Date(v.inputDate).toLocaleDateString('en-US') : '';
       return `${v.location||''},${v.vin||''},${COLOR_LABELS[v.color]||v.color||''},${Math.round(v.startPct)},${Math.round(v.endPct)},${kwh},${Math.round((v.batteryPack||0.66)*100)}%,${status},${dateAdded}`;
     }).join('\n');
@@ -234,8 +251,8 @@
       kwh:   window.EV_COLORS.calcKwh(v.startPct,v.endPct,v.batteryPack||0.66),
       start: Math.round(v.startPct||0),
     }));
-    const byKwh   = [...withData].sort((a,b)=>b.kwh-a.kwh);
-    const byStart = [...withData].sort((a,b)=>a.start-b.start);
+    const byKwh    = [...withData].sort((a,b)=>b.kwh-a.kwh);
+    const byStart  = [...withData].sort((a,b)=>a.start-b.start);
     const totalKwh = byKwh.reduce((s,v)=>s+v.kwh,0);
     const avg      = vehicles.length>0 ? Math.round((totalKwh/vehicles.length)*10)/10 : 0;
     const avgSt    = vehicles.length>0 ? Math.round(byStart.reduce((s,v)=>s+v.start,0)/vehicles.length*100)/100 : 0;
@@ -284,14 +301,12 @@
   }
 
   function refresh(vehicles) {
-    // Always pull directly from store to guarantee freshest data including inputDate
     const vehs = window.store ? window.store.getVehicles() : (vehicles || []);
     buildList(vehs);
     buildTooltips(vehs);
   }
 
   function bindEvents() {
-    // Sort headers
     document.querySelectorAll('.list-table th.sortable').forEach(th => {
       th.style.cursor='pointer';
       th.addEventListener('click', () => {
@@ -301,15 +316,12 @@
       });
     });
 
-    // Search
     const search=document.getElementById('list-search');
     if(search) search.addEventListener('input', e=>{ query=e.target.value; buildList(window.store.getVehicles()); });
 
-    // Export
     const exportBtn=document.getElementById('list-export-btn');
     if(exportBtn) exportBtn.addEventListener('click', exportCSV);
 
-    // Context menu
     const ctxEdit=document.getElementById('ctx-edit');
     const ctxColor=document.getElementById('ctx-color');
     const ctxDelete=document.getElementById('ctx-delete');
@@ -326,7 +338,6 @@
     });
     document.addEventListener('click', e=>{ const m=document.getElementById('ctx-menu'); if(m&&!m.contains(e.target)) hideCtx(); });
 
-    // Edit modal
     const modalClose=document.getElementById('modal-close');
     const saveBtn=document.getElementById('edit-save-btn');
     const overlay=document.getElementById('edit-modal');
@@ -338,7 +349,6 @@
     initColResize();
   }
 
-  // ── Column resize ─────────────────────────────────────────────────────────────
   function initColResize() {
     const table = document.getElementById('list-table');
     if (!table) return;
@@ -348,7 +358,6 @@
     let startX       = 0;
     let startW       = 0;
 
-    // Load saved widths
     try {
       const saved = JSON.parse(localStorage.getItem('ev_list_col_widths') || '{}');
       table.querySelectorAll('th').forEach((th, idx) => {
@@ -357,7 +366,6 @@
       });
     } catch {}
 
-    // Add a resize handle to every th except the last (⋯ menu col)
     const ths = Array.from(table.querySelectorAll('th'));
     ths.forEach((th, idx) => {
       if (idx === ths.length - 1) return;
@@ -376,8 +384,8 @@
         startX       = e.clientX;
         startW       = th.getBoundingClientRect().width;
         handle.classList.add('dragging');
-        document.body.style.cursor     = 'col-resize';
-        document.body.style.userSelect = 'none';
+        document.body.style.cursor        = 'col-resize';
+        document.body.style.userSelect    = 'none';
         document.body.style.pointerEvents = 'none';
         handle.style.pointerEvents = 'auto';
       });
@@ -391,53 +399,32 @@
       }, { passive: true });
     });
 
-    // Global mouse/touch move — resize active column
     document.addEventListener('mousemove', e => {
       if (!activeTh) return;
-      const newW = Math.max(50, startW + (e.clientX - startX));
-      activeTh.style.width = newW + 'px';
+      activeTh.style.width = Math.max(50, startW + (e.clientX - startX)) + 'px';
     });
 
     document.addEventListener('touchmove', e => {
       if (!activeTh) return;
-      const newW = Math.max(50, startW + (e.touches[0].clientX - startX));
-      activeTh.style.width = newW + 'px';
+      activeTh.style.width = Math.max(50, startW + (e.touches[0].clientX - startX)) + 'px';
     }, { passive: true });
 
-    // Global mouseup — stop resizing and save
-    document.addEventListener('mouseup', () => {
+    function saveAndStop() {
       if (!activeTh) return;
       activeHandle && activeHandle.classList.remove('dragging');
-      document.body.style.cursor        = '';
-      document.body.style.userSelect    = '';
-      document.body.style.pointerEvents = '';
-      // Save all column widths
+      document.body.style.cursor = document.body.style.userSelect = document.body.style.pointerEvents = '';
       try {
         const saved = {};
         ths.forEach((th, idx) => {
-          const key = th.dataset.col || String(idx);
-          saved[key] = Math.round(th.getBoundingClientRect().width);
+          saved[th.dataset.col || String(idx)] = Math.round(th.getBoundingClientRect().width);
         });
         localStorage.setItem('ev_list_col_widths', JSON.stringify(saved));
       } catch {}
-      activeHandle = null;
-      activeTh     = null;
-    });
+      activeHandle = activeTh = null;
+    }
 
-    document.addEventListener('touchend', () => {
-      if (!activeTh) return;
-      activeHandle && activeHandle.classList.remove('dragging');
-      try {
-        const saved = {};
-        ths.forEach((th, idx) => {
-          const key = th.dataset.col || String(idx);
-          saved[key] = Math.round(th.getBoundingClientRect().width);
-        });
-        localStorage.setItem('ev_list_col_widths', JSON.stringify(saved));
-      } catch {}
-      activeHandle = null;
-      activeTh     = null;
-    });
+    document.addEventListener('mouseup',  saveAndStop);
+    document.addEventListener('touchend', saveAndStop);
   }
 
   window.listView = { refresh, buildList, buildTooltips, bindEvents };

@@ -4,10 +4,11 @@
  *
  * LOT STRUCTURE (west → east):
  *   Sections: 8T, 7T, 6T, 5T, 4T, 3T, 2T, 1T
- *   Each section: 15 cars wide
- *   Row pattern per section: row, row, [LANE], row, row, [LANE] ... × 15 pairs = 30 rows
+ *   Sections 2T–8T: 15 cars wide, 30 rows each
+ *   Section 1T:     10 cars wide, 31 rows, then [empty gap], then RL-1, RL-2, [LANE], RL-3
+ *   Row pattern:    row, row, [LANE], row, row, [LANE] ...
  *   Rows 1, 18, 19 split into A & B sub-rows
- *   Section 1T also has: [empty gap] + RL-1, RL-2, [LANE], RL-3, RL-4
+ *   Row numbering:  1 = south entrance, 31 = north end (rows render south→north)
  *
  * Vehicles are placed by parsing their location string (e.g. "1T-22", "3T-1A", "1RL-3")
  * Unmatched vehicles overflow into a staging area below the main lot.
@@ -21,7 +22,7 @@
   const ctx    = canvas.getContext('2d');
 
   // ── View state ───────────────────────────────────────────────────────────────
-  let angY          = 0.3;   // slight initial angle so lot has depth
+  let angY          = 0.3;
   let zoomLv        = window.innerWidth < 480 ? 2.5 : 1.0;
   let gph           = 0;
   let raf           = null;
@@ -31,111 +32,56 @@
   let panActive     = false;
   let panStartX     = 0;
   let panStartY     = 0;
-  let panOffX       = 0;   // world-space pan offset X
-  let panOffZ       = 0;   // world-space pan offset Z
-  let isPanMode     = false; // toggled by the mode button
+  let panOffX       = 0;
+  let panOffZ       = 0;
+  let isPanMode     = false;
   let rotInterval   = null;
 
   // ── Lot constants ────────────────────────────────────────────────────────────
-  const SECTIONS     = ['8T','7T','6T','5T','4T','3T','2T','1T']; // west→east (left→right in view)
-  const CARS_PER_ROW = 15;
-  const TOTAL_ROWS   = 30;
-  const AB_ROWS      = [1, 18, 19];   // these rows split into A and B
+  const SECTIONS      = ['8T','7T','6T','5T','4T','3T','2T','1T']; // west→east
+  const RL_ROWS       = ['RL-1','RL-2','RL-3'];   // 1T extension rows, north of 1T-31
+  const CARS_PER_ROW  = 15;   // sections 2T–8T
+  const CARS_1T       = 10;   // section 1T (and its RL extension)
+  const TOTAL_ROWS    = 30;   // sections 2T–8T
+  const TOTAL_ROWS_1T = 31;   // section 1T
+  const AB_ROWS       = [1, 18, 19]; // rows that split into A and B sub-rows
 
   // Spacing units (world space)
-  const CAR_W    = 1.6;   // car width (along row)
-  const CAR_D    = 2.8;   // car depth (nose to tail)
-  const CAR_GAP  = 0.25;  // gap between cars in same row
-  const ROW_GAP  = 0.5;   // gap between rows (nose-to-nose)
-  const LANE_W   = 3.2;   // drive lane width
-  const SEC_GAP  = 4.0;   // gap between sections (cross-lane)
+  // Z increases going north. Row 1 is at the south (high Z), row 31 at north (low Z).
+  const CAR_W   = 1.6;   // car width (along row)
+  const CAR_D   = 2.8;   // car depth (nose to tail)
+  const CAR_GAP = 0.25;  // gap between cars in same row
+  const ROW_GAP = 0.5;   // gap between rows (nose-to-nose)
+  const LANE_W  = 3.2;   // drive lane width
+  const SEC_GAP = 4.0;   // gap between sections (cross-lane)
 
-  // Build the lot grid — returns array of slot objects with world positions
-  // Each slot: { sectionIdx, rowLabel, carIdx, wx, wz, facing }
-  // facing: 1 = nose north, -1 = nose south (alternates per row pair)
-  function buildLotGrid() {
-    const slots = [];
-
-    // For each section (0=8T ... 7=1T)
-    SECTIONS.forEach((secName, secIdx) => {
-      // Section X offset (east = positive X in world space)
-      // Each section is 15 cars wide
-      const secW     = CARS_PER_ROW * (CAR_W + CAR_GAP);
-      const secOffX  = secIdx * (secW + SEC_GAP);
-
-      // Build row list for this section
-      const rowList = buildRowList(secName);
-
-      // Z offset accumulator (north = negative Z)
-      let zOff = 0;
-
-      rowList.forEach(rowEntry => {
-        if (rowEntry.type === 'lane') {
-          zOff += LANE_W;
-          return;
-        }
-        if (rowEntry.type === 'gap') {
-          zOff += LANE_W * 2;
-          return;
-        }
-        // Normal row — place CARS_PER_ROW cars
-        const facing = rowEntry.pairPos === 0 ? 1 : -1; // pair pos 0 = faces north, 1 = faces south
-        for (let c = 0; c < CARS_PER_ROW; c++) {
-          const wx = secOffX + c * (CAR_W + CAR_GAP);
-          const wz = zOff;
-          slots.push({
-            section:  secName,
-            rowLabel: rowEntry.label,
-            carIdx:   c + 1,
-            spotId:   `${secName}-${rowEntry.label}`,
-            wx,
-            wz,
-            facing,
-          });
-        }
-        zOff += CAR_D + ROW_GAP;
-      });
-
-      // RL section only for 1T
-      if (secName === '1T') {
-        zOff += LANE_W * 2; // empty gap
-        const rlRows = ['RL-1','RL-2',null,'RL-3','RL-4'];
-        let rlPair = 0;
-        rlRows.forEach(rl => {
-          if (rl === null) { zOff += LANE_W; rlPair = 0; return; }
-          const facing = rlPair === 0 ? 1 : -1;
-          for (let c = 0; c < CARS_PER_ROW; c++) {
-            slots.push({
-              section:  '1RL',
-              rowLabel: rl,
-              carIdx:   c + 1,
-              spotId:   `1RL-${rl}`,
-              wx:       secOffX + c * (CAR_W + CAR_GAP),
-              wz:       zOff,
-              facing,
-            });
-          }
-          zOff += CAR_D + ROW_GAP;
-          rlPair = (rlPair + 1) % 2;
-        });
-      }
-    });
-
-    return slots;
+  // ── Helper: section X offset ─────────────────────────────────────────────────
+  // Accumulates the widths of all sections west of secIdx to get the X start.
+  function getSectionOffX(secIdx) {
+    let offX = 0;
+    for (let i = 0; i < secIdx; i++) {
+      const prevCars = SECTIONS[i] === '1T' ? CARS_1T : CARS_PER_ROW;
+      offX += prevCars * (CAR_W + CAR_GAP) + SEC_GAP;
+    }
+    return offX;
   }
 
-  // Build ordered row list for a section including lanes and A/B splits
-  function buildRowList(secName) {
+  // ── Build ordered row list (south → north = row 1 first, highest row last) ──
+  // Returns entries in south-to-north order so that Z accumulates northward.
+  // Each entry: { type:'row'|'lane'|'gap', label, pairPos }
+  function buildRowList(rowCount) {
     const rows = [];
-    let pairPos = 0; // 0 or 1 within each 2-row pair
+    let pairPos = 0;
 
-    for (let r = 1; r <= TOTAL_ROWS; r++) {
+    // Rows are numbered 1 (south) → rowCount (north).
+    // We render from south to north, so we iterate 1 → rowCount.
+    for (let r = 1; r <= rowCount; r++) {
       if (AB_ROWS.includes(r)) {
-        // A sub-row
+        // A sub-row (south half of this numbered row)
         rows.push({ type: 'row', label: `${r}A`, pairPos });
         pairPos = (pairPos + 1) % 2;
         if (pairPos === 0) rows.push({ type: 'lane' });
-        // B sub-row
+        // B sub-row (north half of this numbered row)
         rows.push({ type: 'row', label: `${r}B`, pairPos });
         pairPos = (pairPos + 1) % 2;
         if (pairPos === 0) rows.push({ type: 'lane' });
@@ -148,9 +94,86 @@
     return rows;
   }
 
-  // Pre-build slot lookup: spotId → slot index in lotSlots
+  // ── Build RL row list from RL_ROWS constant ───────────────────────────────────
+  // Pattern: RL-1, RL-2, [LANE], RL-3
+  // RL_ROWS = ['RL-1','RL-2','RL-3'] — lane is inserted after every 2nd row
+  function buildRLRowList() {
+    const rows = [];
+    let pairPos = 0;
+    RL_ROWS.forEach(label => {
+      rows.push({ type: 'row', label, pairPos });
+      pairPos = (pairPos + 1) % 2;
+      if (pairPos === 0) rows.push({ type: 'lane' });
+    });
+    return rows;
+  }
+
+  // ── Build full lot grid ───────────────────────────────────────────────────────
+  function buildLotGrid() {
+    const slots = [];
+
+    SECTIONS.forEach((secName, secIdx) => {
+      const carsThisSec = secName === '1T' ? CARS_1T : CARS_PER_ROW;
+      const rowsThisSec = secName === '1T' ? TOTAL_ROWS_1T : TOTAL_ROWS;
+      const secOffX     = getSectionOffX(secIdx);
+
+      // Build main row list for this section (south → north)
+      const rowList = buildRowList(rowsThisSec);
+
+      // Z starts at 0 for the southernmost row and increases northward
+      let zOff = 0;
+
+      rowList.forEach(rowEntry => {
+        if (rowEntry.type === 'lane') { zOff += LANE_W; return; }
+        if (rowEntry.type === 'gap')  { zOff += LANE_W * 2; return; }
+
+        const facing = rowEntry.pairPos === 0 ? 1 : -1;
+        for (let c = 0; c < carsThisSec; c++) {
+          slots.push({
+            section:  secName,
+            rowLabel: rowEntry.label,
+            carIdx:   c + 1,
+            spotId:   `${secName}-${rowEntry.label}`,
+            wx:       secOffX + c * (CAR_W + CAR_GAP),
+            wz:       zOff,
+            facing,
+          });
+        }
+        zOff += CAR_D + ROW_GAP;
+      });
+
+      // ── RL extension — only for 1T, north of 1T-31 ────────────────────────
+      if (secName === '1T') {
+        // One empty/unused row gap between 1T-31 and RL-1
+        zOff += (CAR_D + ROW_GAP) + LANE_W; // one unused row + lane space
+
+        const rlList = buildRLRowList();
+        rlList.forEach(rowEntry => {
+          if (rowEntry.type === 'lane') { zOff += LANE_W; return; }
+
+          const facing = rowEntry.pairPos === 0 ? 1 : -1;
+          for (let c = 0; c < CARS_1T; c++) {
+            slots.push({
+              section:  '1RL',
+              rowLabel: rowEntry.label,
+              carIdx:   c + 1,
+              spotId:   `1RL-${rowEntry.label}`,
+              wx:       secOffX + c * (CAR_W + CAR_GAP),
+              wz:       zOff,
+              facing,
+            });
+          }
+          zOff += CAR_D + ROW_GAP;
+        });
+      }
+    });
+
+    return slots;
+  }
+
+  // ── Slot index ────────────────────────────────────────────────────────────────
   let lotSlots     = [];
-  let slotBySpotId = {}; // "1T-22" → [slot, slot...] (15 per row)
+  let slotBySpotId = {}; // spotId → [slotIndex, ...] (10 per row for 1T/1RL, 15 for others)
   let lotBounds    = { minX:0, maxX:0, minZ:0, maxZ:0 };
 
   function initLot() {
@@ -158,9 +181,8 @@
     slotBySpotId = {};
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     lotSlots.forEach((s, i) => {
-      const key = s.spotId;
-      if (!slotBySpotId[key]) slotBySpotId[key] = [];
-      slotBySpotId[key].push(i);
+      if (!slotBySpotId[s.spotId]) slotBySpotId[s.spotId] = [];
+      slotBySpotId[s.spotId].push(i);
       if (s.wx < minX) minX = s.wx;
       if (s.wx > maxX) maxX = s.wx;
       if (s.wz < minZ) minZ = s.wz;
@@ -171,33 +193,25 @@
 
   initLot();
 
-  // Parse a vehicle's location string into a spotId
-  // "1T-22" → "1T-22", "3T-1A" → "3T-1A", "1RL-3" → "1RL-RL-3"
+  // ── Location parser ───────────────────────────────────────────────────────────
   function parseLocation(loc) {
     if (!loc) return null;
-    // Normalize: trim whitespace, uppercase
     let s = String(loc).trim().toUpperCase().replace(/\s+/g, '');
-
-    // Already correct format: "1T-22", "3T-1A", "1RL-3"
     if (/^\d+T-\S+/.test(s) || /^\d+RL-\S+/.test(s)) return s;
-
-    // Try to fix missing dash: "1T22" → "1T-22", "3T1A" → "3T-1A"
     const noDash = s.match(/^(\d+T|1RL)(\S+)$/);
     if (noDash) return noDash[1] + '-' + noDash[2];
-
     return null;
   }
 
-  // Build all valid spotIds for quick lookup debugging
   function getValidSpotIds() {
     return Object.keys(slotBySpotId);
   }
 
-  // Assign vehicles to slots. Returns array of {slot, vehicle, vehicleIdx}
+  // ── Vehicle assignment ────────────────────────────────────────────────────────
   function assignVehicles(vehs) {
-    const assigned   = [];
-    const usedSlots  = new Set();
-    const overflow   = [];
+    const assigned      = [];
+    const usedSlots     = new Set();
+    const overflow      = [];
     const unmatchedLocs = new Set();
 
     vehs.forEach((v, vi) => {
@@ -215,20 +229,20 @@
     });
 
     if (unmatchedLocs.size > 0) {
-      console.warn('EV Lot: unmatched locations:', [...unmatchedLocs].slice(0,10));
-      console.info('Valid spot IDs sample:', getValidSpotIds().slice(0,10));
+      console.warn('EV Lot: unmatched locations:', [...unmatchedLocs].slice(0, 10));
+      console.info('Valid spot IDs sample:', getValidSpotIds().slice(0, 10));
     }
 
-    // Place overflow in a staging area south of main lot
     overflow.forEach((o, oi) => {
-      const cols  = Math.ceil(Math.sqrt(overflow.length * 2));
-      const oRow  = Math.floor(oi / cols);
-      const oCol  = oi % cols;
-      const stagW = (lotBounds.maxX - lotBounds.minX);
-      const wx    = lotBounds.minX + oCol * (CAR_W + CAR_GAP + 0.5);
-      const wz    = lotBounds.maxZ + LANE_W * 3 + oRow * (CAR_D + ROW_GAP + 0.5);
+      const cols = Math.ceil(Math.sqrt(overflow.length * 2));
+      const oRow = Math.floor(oi / cols);
+      const oCol = oi % cols;
       assigned.push({
-        slot: { wx, wz, facing: 1, section: 'STAGING', rowLabel: '', carIdx: oi+1, spotId: '' },
+        slot: {
+          wx: lotBounds.minX + oCol * (CAR_W + CAR_GAP + 0.5),
+          wz: lotBounds.maxZ + LANE_W * 3 + oRow * (CAR_D + ROW_GAP + 0.5),
+          facing: 1, section: 'STAGING', rowLabel: '', carIdx: oi + 1, spotId: '',
+        },
         vehicle: o.vehicle,
         vehicleIdx: o.vehicleIdx,
       });
@@ -237,7 +251,7 @@
     return assigned;
   }
 
-  // ── Isometric projection (horizontal rotation only) ──────────────────────────
+  // ── Isometric projection ──────────────────────────────────────────────────────
   function iso(x, y, z, cx, cy, sc) {
     const cosA = Math.cos(angY);
     const sinA = Math.sin(angY);
@@ -247,7 +261,6 @@
     return [cx + rx * sc, cy + rz * sc * TILT - y * sc];
   }
 
-  // ── Color helpers ────────────────────────────────────────────────────────────
   function dk(hex, a) {
     let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
     return `rgb(${Math.max(0,r-a)},${Math.max(0,g-a)},${Math.max(0,b-a)})`;
@@ -258,128 +271,281 @@
   }
   function poly(pts, fill, strokeC, sw=0.4) {
     ctx.beginPath(); ctx.moveTo(...pts[0]);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(...pts[i]);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(...pts[i]);
     ctx.closePath(); ctx.fillStyle=fill; ctx.fill();
-    if(strokeC){ctx.strokeStyle=strokeC;ctx.lineWidth=sw;ctx.stroke();}
+    if (strokeC) { ctx.strokeStyle=strokeC; ctx.lineWidth=sw; ctx.stroke(); }
   }
 
-  // ── 2027 Bolt EUV drawing (facing param: 1=north, -1=south) ─────────────────
+  // ── 2027 Bolt EUV drawing ─────────────────────────────────────────────────────
   function drawBoltEUV(v, wx, wz, cx, cy, sc, facing) {
     const P   = (x,y,z) => iso(wx+x, y, wz+z*facing, cx, cy, sc);
     const pal = window.EV_COLORS.getPalette(v.color);
     const dpr = window.devicePixelRatio || 1;
 
-    const L=1.5, W=0.72, H=0.36, WH=0.1, RH=0.58, CLADD=0.14, ri=0.055;
-    const RI_F=0.34, RI_R=0.28, RW=0.64;
+    // ── Proportions (world units) ─────────────────────────────────────────────
+    const L    = 1.72;   // length (longer than before — Bolt EUV is ~4.3m)
+    const W    = 0.78;   // width
+    const WH   = 0.10;   // wheel hub height (ground clearance)
+    const BH   = 0.22;   // body side height (bottom of greenhouse)
+    const RH   = 0.52;   // full roof height above body top
+    const CLAD = 0.06;   // lower cladding strip height
+    const ri   = 0.04;   // roof inset from body edges
 
-    const BFL=P(L/2,WH,-W/2), BFR=P(L/2,WH,W/2);
-    const BRL=P(-L/2,WH,-W/2), BRR=P(-L/2,WH,W/2);
-    const TFL=P(L/2,WH+H,-W/2), TFR=P(L/2,WH+H,W/2);
-    const TRL=P(-L/2,WH+H,-W/2), TRR=P(-L/2,WH+H,W/2);
-    const rxF=L/2-RI_F, rxR=-L/2+RI_R;
-    const RF_A=P(rxF,WH+H+RH*0.82,-W/2+ri), RF_B=P(rxF,WH+H+RH*0.82,W/2-ri);
-    const RM_A=P(rxF-0.28,WH+H+RH,-W/2+ri), RM_B=P(rxF-0.28,WH+H+RH,W/2-ri);
-    const RR_A=P(rxR,WH+H+RH*0.42,-W/2+ri), RR_B=P(rxR,WH+H+RH*0.42,W/2-ri);
-    const CFL=P(L/2,WH+CLADD,-W/2), CFR=P(L/2,WH+CLADD,W/2);
-    const CRL=P(-L/2,WH+CLADD,-W/2), CRR=P(-L/2,WH+CLADD,W/2);
+    // Key X positions along body length
+    const xFront  =  L / 2;         // front bumper face
+    const xFHood  =  L / 2 - 0.18;  // hood start / A-pillar base
+    const xARoof  =  L / 2 - 0.32;  // A-pillar top / front windscreen top
+    const xMRoof  =  0.08;          // roof peak (slightly forward of center)
+    const xCPillar= -L / 2 + 0.28;  // C-pillar top
+    const xRHatch = -L / 2 + 0.10;  // rear hatch top (fastback kick)
+    const xRear   = -L / 2;         // rear bumper face
 
-    // Shadow
-    const shd=iso(wx,0,wz,cx,cy,sc);
-    ctx.beginPath();ctx.ellipse(shd[0],shd[1]+2*dpr,sc*L*.55*dpr,sc*W*.18*dpr,0,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,0,0,.32)';ctx.fill();
+    // Y heights
+    const yGround = WH;
+    const yBody   = WH + BH;
+    const yRoof   = WH + BH + RH;
+    const yHood   = WH + BH + 0.06; // hood surface (slight rise)
+    const yARoof  = WH + BH + RH * 0.88;
+    const yMRoof  = WH + BH + RH;
+    const yCRoof  = WH + BH + RH * 0.72;
+    const yHatch  = WH + BH + RH * 0.28;
 
-    // Wheels
-    [[L/2-.24,0,-W/2-.03],[L/2-.24,0,W/2+.03],[-L/2+.24,0,-W/2-.03],[-L/2+.24,0,W/2+.03]].forEach(([wx2,,wz2])=>{
-      const wc=iso(wx+wx2,WH*.5,wz+wz2*facing,cx,cy,sc);
-      const wt=iso(wx+wx2,WH,wz+wz2*facing,cx,cy,sc);
-      const wr=0.13*sc*dpr;
-      ctx.beginPath();ctx.arc(wc[0],wc[1],wr,0,Math.PI*2);ctx.fillStyle='#111';ctx.fill();
-      ctx.beginPath();ctx.arc(wt[0],wt[1],wr*.7,0,Math.PI*2);ctx.fillStyle=pal.rim;ctx.fill();
-      for(let s=0;s<5;s++){const a=s/5*Math.PI*2;ctx.beginPath();ctx.moveTo(wt[0],wt[1]);ctx.lineTo(wt[0]+Math.cos(a)*wr*.5,wt[1]+Math.sin(a)*wr*.5);ctx.strokeStyle='#555';ctx.lineWidth=dpr;ctx.stroke();}
-      ctx.beginPath();ctx.arc(wt[0],wt[1],wr*.22,0,Math.PI*2);ctx.fillStyle='#777';ctx.fill();
-      ctx.beginPath();ctx.arc(wc[0],wc[1],wr*1.12,Math.PI*.1,Math.PI*.9);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=3*dpr;ctx.stroke();
+    // ── Shadow ────────────────────────────────────────────────────────────────
+    const shd = iso(wx, 0, wz, cx, cy, sc);
+    ctx.beginPath();
+    ctx.ellipse(shd[0], shd[1] + 1.5*dpr, sc*L*0.52*dpr, sc*W*0.16*dpr, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fill();
+
+    // ── Wheels ────────────────────────────────────────────────────────────────
+    const wheelPositions = [
+      [ L/2 - 0.28,  W/2 + 0.03],   // front right
+      [ L/2 - 0.28, -W/2 - 0.03],   // front left
+      [-L/2 + 0.28,  W/2 + 0.03],   // rear right
+      [-L/2 + 0.28, -W/2 - 0.03],   // rear left
+    ];
+    wheelPositions.forEach(([wx2, wz2]) => {
+      const wGround = iso(wx+wx2, WH*0.4, wz+wz2*facing, cx, cy, sc);
+      const wHub    = iso(wx+wx2, WH,     wz+wz2*facing, cx, cy, sc);
+      const wr      = 0.145 * sc * dpr;
+
+      // Tyre
+      ctx.beginPath(); ctx.arc(wGround[0], wGround[1], wr*1.08, 0, Math.PI*2);
+      ctx.fillStyle = '#111'; ctx.fill();
+      // Wheel arch highlight
+      ctx.beginPath(); ctx.arc(wGround[0], wGround[1], wr*1.15, Math.PI, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1.2*dpr; ctx.stroke();
+      // Rim base
+      ctx.beginPath(); ctx.arc(wHub[0], wHub[1], wr*0.78, 0, Math.PI*2);
+      ctx.fillStyle = pal.rim; ctx.fill();
+      // Spoke pattern (5 spokes)
+      for (let s=0; s<5; s++) {
+        const a = s / 5 * Math.PI * 2 - 0.3;
+        ctx.beginPath();
+        ctx.moveTo(wHub[0] + Math.cos(a)*wr*0.18, wHub[1] + Math.sin(a)*wr*0.18);
+        ctx.lineTo(wHub[0] + Math.cos(a)*wr*0.65, wHub[1] + Math.sin(a)*wr*0.65);
+        ctx.strokeStyle = 'rgba(160,160,170,.9)'; ctx.lineWidth = 2.2*dpr; ctx.stroke();
+      }
+      // Centre cap
+      ctx.beginPath(); ctx.arc(wHub[0], wHub[1], wr*0.18, 0, Math.PI*2);
+      ctx.fillStyle = '#888'; ctx.fill();
+      ctx.beginPath(); ctx.arc(wHub[0], wHub[1], wr*0.08, 0, Math.PI*2);
+      ctx.fillStyle = '#555'; ctx.fill();
+      // Brake rotor hint
+      ctx.beginPath(); ctx.arc(wGround[0], wGround[1], wr*1.1, Math.PI*0.1, Math.PI*0.9);
+      ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 3.5*dpr; ctx.stroke();
     });
 
-    // Cladding
-    poly([BRL,BRR,CRR,CRL],'#1a1a1e','rgba(0,0,0,.5)');
-    poly([BFL,BFR,CFR,CFL],'#1a1a1e','rgba(0,0,0,.5)');
-    poly([BFL,BRL,CRL,CFL],'#111116','rgba(0,0,0,.4)');
-    poly([BFR,BRR,CRR,CFR],'#101014','rgba(0,0,0,.4)');
+    // ── Lower body cladding ───────────────────────────────────────────────────
+    const cladY0 = WH, cladY1 = WH + CLAD;
+    poly([
+      P(xRear,  cladY0, -W/2), P(xFront, cladY0, -W/2),
+      P(xFront, cladY1, -W/2), P(xRear,  cladY1, -W/2),
+    ], '#222228', 'rgba(0,0,0,.4)');
+    poly([
+      P(xRear,  cladY0,  W/2), P(xFront, cladY0,  W/2),
+      P(xFront, cladY1,  W/2), P(xRear,  cladY1,  W/2),
+    ], '#1e1e24', 'rgba(0,0,0,.35)');
+    // Rear cladding
+    poly([
+      P(xRear, cladY0, -W/2), P(xRear, cladY0,  W/2),
+      P(xRear, cladY1,  W/2), P(xRear, cladY1, -W/2),
+    ], '#1a1a20', 'rgba(0,0,0,.3)');
 
-    // Body
-    poly([CRL,CRR,TRR,TRL],dk(pal.body,42),'rgba(0,0,0,.35)');
-    poly([CFL,CFR,TFR,TFL],dk(pal.body,20),'rgba(0,0,0,.25)');
-    poly([CFL,CRL,TRL,TFL],pal.body,'rgba(0,0,0,.2)');
-    poly([CFR,CRR,TRR,TFR],dk(pal.body,30),'rgba(0,0,0,.2)');
-    poly([TFL,TFR,TRR,TRL],pal.body,'rgba(0,0,0,.15)');
+    // ── Body sides ────────────────────────────────────────────────────────────
+    // Left side (driver) — facing camera at default angle
+    poly([
+      P(xRear,   cladY1,  -W/2), P(xFront,  cladY1,  -W/2),
+      P(xFHood,  yBody,   -W/2), P(xRear,   yBody,   -W/2),
+    ], pal.body, 'rgba(0,0,0,.2)');
+    // Right side
+    poly([
+      P(xRear,   cladY1,   W/2), P(xFront,  cladY1,   W/2),
+      P(xFHood,  yBody,    W/2), P(xRear,   yBody,    W/2),
+    ], dk(pal.body, 28), 'rgba(0,0,0,.2)');
 
-    // Roof/cabin
-    poly([TFL,RF_A,RM_A,TRL],dk(pal.body,15),'rgba(0,0,0,.2)');
-    poly([TFL,TFR,RF_B,RF_A],'rgba(140,200,240,.18)','rgba(200,220,255,.2)');
-    poly([RF_A,RF_B,RM_B,RM_A],lt(pal.body,10),'rgba(0,0,0,.14)');
-    poly([RM_A,RM_B,RR_B,RR_A],pal.body,'rgba(0,0,0,.16)');
-    poly([RM_A,RR_A,TRL],'rgba(100,160,210,.2)','rgba(150,200,240,.18)');
-    poly([RM_B,RR_B,TRR],'rgba(80,140,190,.18)','rgba(150,200,240,.14)');
-    poly([RR_A,RR_B,TRR,TRL],'rgba(60,110,160,.22)','rgba(100,160,210,.2)');
-    const WDF_L=P(L/2-0.2,WH+H,-W/2+ri+.01), WDR_L=P(-L/2+0.13,WH+H,-W/2+ri+.01);
-    poly([WDF_L,RF_A,RM_A,RR_A,WDR_L],'rgba(80,150,210,.25)','rgba(160,210,250,.18)');
-    const WDF_R=P(L/2-0.2,WH+H,W/2-ri-.01), WDR_R=P(-L/2+0.13,WH+H,W/2-ri-.01);
-    poly([WDF_R,RF_B,RM_B,RR_B,WDR_R],'rgba(60,130,190,.22)','rgba(140,190,230,.14)');
+    // ── Hood ─────────────────────────────────────────────────────────────────
+    poly([
+      P(xFront, yGround+CLAD, -W/2), P(xFront, yGround+CLAD,  W/2),
+      P(xFHood, yHood,         W/2), P(xFHood, yHood,        -W/2),
+    ], lt(pal.body, 12), 'rgba(0,0,0,.18)');
 
-    // Front grille hex
-    const gc=iso(wx+L/2+.02,WH+CLADD+.03,wz,cx,cy,sc);
-    for(let hi=-1;hi<=1;hi++){for(let vi=0;vi<=1;vi++){
-      const hx=gc[0]+hi*.28*W*sc*dpr,hy=gc[1]+(vi*.38-.2)*CLADD*sc*dpr;
-      ctx.beginPath();for(let s=0;s<6;s++){const a=s*Math.PI/3+Math.PI/6;ctx.lineTo(hx+Math.cos(a)*3.2*dpr,hy+Math.sin(a)*3.2*dpr);}
-      ctx.closePath();ctx.fillStyle='#1a1a22';ctx.strokeStyle='#333';ctx.lineWidth=.5;ctx.fill();ctx.stroke();
-    }}
+    // Hood top panel
+    poly([
+      P(xFHood, yHood,  -W/2+ri), P(xFHood, yHood,   W/2-ri),
+      P(xARoof, yARoof,  W/2-ri), P(xARoof, yARoof, -W/2+ri),
+    ], lt(pal.body, 8), 'rgba(0,0,0,.12)');
 
-    // Headlights
-    [P(L/2+.02,WH+H-.05,-W/2+.05),P(L/2+.02,WH+H-.05,W/2-.05)].forEach(p=>{
-      ctx.beginPath();ctx.arc(p[0],p[1],2*dpr,0,Math.PI*2);ctx.fillStyle='#ddeeff';ctx.fill();
-    });
-    const D1=iso(wx+L/2+.02,WH+H-.02,wz-(W/2-.1)*facing,cx,cy,sc);
-    const D2=iso(wx+L/2+.02,WH+H-.02,wz+(W/2-.1)*facing,cx,cy,sc);
-    ctx.strokeStyle='rgba(200,230,255,.8)';ctx.lineWidth=1.2*dpr;
-    ctx.beginPath();ctx.moveTo(D1[0]-3*dpr,D1[1]);ctx.lineTo(D1[0]+3*dpr,D1[1]);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(D2[0]-3*dpr,D2[1]);ctx.lineTo(D2[0]+3*dpr,D2[1]);ctx.stroke();
+    // ── Windscreen (front glass) ──────────────────────────────────────────────
+    poly([
+      P(xFHood, yBody,   -W/2+ri+0.02), P(xFHood, yBody,    W/2-ri-0.02),
+      P(xARoof, yARoof,   W/2-ri-0.02), P(xARoof, yARoof,  -W/2+ri+0.02),
+    ], pal.glass, 'rgba(180,220,255,.25)');
 
-    // Taillights
-    const TL1=iso(wx-L/2-.01,WH+H-.07,wz-(W/2-.05)*facing,cx,cy,sc);
-    const TL2=iso(wx-L/2-.01,WH+H-.07,wz+(W/2-.05)*facing,cx,cy,sc);
-    ctx.beginPath();ctx.moveTo(...TL1);ctx.lineTo(...TL2);
-    ctx.strokeStyle='rgba(255,30,20,.9)';ctx.lineWidth=1.8*dpr;ctx.stroke();
+    // ── Roof panel ────────────────────────────────────────────────────────────
+    poly([
+      P(xARoof, yARoof, -W/2+ri), P(xARoof, yARoof,  W/2-ri),
+      P(xMRoof, yMRoof,  W/2-ri), P(xMRoof, yMRoof, -W/2+ri),
+    ], lt(pal.body, 18), 'rgba(0,0,0,.1)');
+    poly([
+      P(xMRoof,   yMRoof,  -W/2+ri), P(xMRoof,   yMRoof,   W/2-ri),
+      P(xCPillar, yCRoof,   W/2-ri), P(xCPillar, yCRoof,  -W/2+ri),
+    ], lt(pal.body, 10), 'rgba(0,0,0,.14)');
 
-    // Roof rails
-    const RA1=iso(wx+L/2-.28,WH+H+RH+.02,wz-(W/2-ri-.01)*facing,cx,cy,sc);
-    const RA2=iso(wx-L/2+.18,WH+H+RH*.38+.02,wz-(W/2-ri-.01)*facing,cx,cy,sc);
-    ctx.beginPath();ctx.moveTo(...RA1);ctx.lineTo(...RA2);
-    ctx.strokeStyle='rgba(80,80,80,.75)';ctx.lineWidth=1.2*dpr;ctx.stroke();
+    // ── Rear hatch glass (fastback slope) ─────────────────────────────────────
+    poly([
+      P(xCPillar, yCRoof,  -W/2+ri+0.02), P(xCPillar, yCRoof,   W/2-ri-0.02),
+      P(xRHatch,  yHatch,   W/2-ri-0.02), P(xRHatch,  yHatch,  -W/2+ri+0.02),
+    ], dk(pal.glass, 15), 'rgba(120,180,230,.2)');
 
-    // Charge port
-    const statusColor=window.EV_COLORS.getStatusColor(v.startPct,v.endPct);
-    const pp=iso(wx-L/2+.32,WH+H-.11,wz-(W/2)*facing,cx,cy,sc);
-    ctx.beginPath();ctx.arc(pp[0],pp[1],3.2*dpr,0,Math.PI*2);
-    ctx.fillStyle=statusColor;ctx.shadowColor=statusColor;ctx.shadowBlur=7;ctx.fill();ctx.shadowBlur=0;
+    // Rear hatch panel below glass
+    poly([
+      P(xRHatch, yHatch,  -W/2+ri), P(xRHatch, yHatch,   W/2-ri),
+      P(xRear,   yBody,    W/2),    P(xRear,   yBody,   -W/2),
+    ], dk(pal.body, 18), 'rgba(0,0,0,.22)');
 
-    // Badge + label stored for hit detection
-    const topP=iso(wx,WH+H+RH+.2,wz,cx,cy,sc);
-    const pct=Math.round(v.endPct);
-    const bw=26*dpr,bh=11*dpr;
-    ctx.fillStyle='rgba(0,0,0,.72)';ctx.beginPath();ctx.roundRect(topP[0]-bw/2,topP[1]-bh/2,bw,bh,3);ctx.fill();
-    ctx.fillStyle=statusColor;ctx.font=`600 ${Math.round(7.5*dpr)}px -apple-system,sans-serif`;
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(pct+'%',topP[0],topP[1]);
+    // ── Rear panel ────────────────────────────────────────────────────────────
+    poly([
+      P(xRear, cladY1, -W/2), P(xRear, cladY1,  W/2),
+      P(xRear, yBody,   W/2), P(xRear, yBody,  -W/2),
+    ], dk(pal.body, 35), 'rgba(0,0,0,.4)');
 
-    const lp=iso(wx,WH+H+RH+.35,wz,cx,cy,sc);
-    ctx.fillStyle='rgba(155,180,205,.6)';ctx.font=`${Math.round(6.5*dpr)}px -apple-system,sans-serif`;
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(v.location||'',lp[0],lp[1]);
+    // ── Front fascia ──────────────────────────────────────────────────────────
+    poly([
+      P(xFront, yGround+CLAD, -W/2), P(xFront, yGround+CLAD,  W/2),
+      P(xFront, yBody,         W/2), P(xFront, yBody,        -W/2),
+    ], dk(pal.body, 22), 'rgba(0,0,0,.3)');
 
-    return { hx: topP[0], hy: topP[1], hr: 16*dpr };
+    // Lower front bumper intake (dark)
+    const intakeY0 = WH + CLAD;
+    const intakeY1 = WH + CLAD + 0.07;
+    poly([
+      P(xFront+0.01, intakeY0, -W/2+0.08), P(xFront+0.01, intakeY0,  W/2-0.08),
+      P(xFront+0.01, intakeY1,  W/2-0.12), P(xFront+0.01, intakeY1, -W/2+0.12),
+    ], '#0d0d12', 'rgba(0,0,0,.6)', 0.3);
+
+    // Charging port door (flush panel, front left quarter)
+    poly([
+      P(xFront-0.08, yBody-0.04, -W/2-0.01),
+      P(xFront-0.04, yBody-0.04, -W/2-0.01),
+      P(xFront-0.04, yBody-0.12, -W/2-0.01),
+      P(xFront-0.08, yBody-0.12, -W/2-0.01),
+    ], dk(pal.body, 8), 'rgba(100,160,220,.35)', 0.5);
+
+    // ── DRL / headlight strip (full-width LED bar) ────────────────────────────
+    const hlY = yBody - 0.03;
+    const hl1 = iso(wx + xFront + 0.01, hlY, wz - (W/2-0.04)*facing, cx, cy, sc);
+    const hl2 = iso(wx + xFront + 0.01, hlY, wz + (W/2-0.04)*facing, cx, cy, sc);
+    // Outer glow
+    ctx.beginPath(); ctx.moveTo(hl1[0], hl1[1]); ctx.lineTo(hl2[0], hl2[1]);
+    ctx.strokeStyle = 'rgba(210,235,255,.25)'; ctx.lineWidth = 4*dpr; ctx.stroke();
+    // Inner bright strip
+    ctx.beginPath(); ctx.moveTo(hl1[0], hl1[1]); ctx.lineTo(hl2[0], hl2[1]);
+    ctx.strokeStyle = 'rgba(230,245,255,.9)'; ctx.lineWidth = 1.4*dpr; ctx.stroke();
+    // Individual LED dots
+    const numLEDs = 7;
+    for (let i=0; i<numLEDs; i++) {
+      const t    = (i / (numLEDs-1)) * 2 - 1;          // -1 to +1
+      const lz   = wz + t * (W/2 - 0.06) * facing;
+      const ledP = iso(wx + xFront + 0.01, hlY, lz, cx, cy, sc);
+      ctx.beginPath(); ctx.arc(ledP[0], ledP[1], 1.4*dpr, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(245,250,255,.95)'; ctx.fill();
+    }
+
+    // ── Tail light bar (full-width LED) ───────────────────────────────────────
+    const tlY  = yBody - 0.04;
+    const tl1  = iso(wx + xRear - 0.01, tlY, wz - (W/2-0.03)*facing, cx, cy, sc);
+    const tl2  = iso(wx + xRear - 0.01, tlY, wz + (W/2-0.03)*facing, cx, cy, sc);
+    ctx.beginPath(); ctx.moveTo(...tl1); ctx.lineTo(...tl2);
+    ctx.strokeStyle = 'rgba(255,20,20,.9)'; ctx.lineWidth = 2.2*dpr; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...tl1); ctx.lineTo(...tl2);
+    ctx.strokeStyle = 'rgba(255,80,80,.3)'; ctx.lineWidth = 5*dpr; ctx.stroke();
+
+    // ── Side windows ─────────────────────────────────────────────────────────
+    // Front door window (left/visible side)
+    poly([
+      P(xFHood+0.04, yBody+0.01, -W/2-0.01),
+      P(xMRoof-0.05, yBody+0.01, -W/2-0.01),
+      P(xMRoof-0.05, yCRoof-0.08,-W/2-0.01),
+      P(xARoof+0.02, yARoof-0.04,-W/2-0.01),
+    ], 'rgba(30,70,110,.62)', 'rgba(120,180,240,.2)', 0.4);
+    // Rear door window
+    poly([
+      P(xMRoof-0.04, yBody+0.01, -W/2-0.01),
+      P(xCPillar+0.04,yBody+0.01,-W/2-0.01),
+      P(xCPillar+0.04,yCRoof-0.06,-W/2-0.01),
+      P(xMRoof-0.04, yCRoof-0.08,-W/2-0.01),
+    ], 'rgba(25,60,100,.58)', 'rgba(110,170,230,.18)', 0.4);
+
+    // ── Door lines (panel gaps) ───────────────────────────────────────────────
+    const doorX = xMRoof - 0.04;
+    const dgTop = iso(wx+doorX, yBody+0.01, wz-W/2*facing, cx, cy, sc);
+    const dgBot = iso(wx+doorX, WH+CLAD,   wz-W/2*facing, cx, cy, sc);
+    ctx.beginPath(); ctx.moveTo(...dgTop); ctx.lineTo(...dgBot);
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.8*dpr; ctx.stroke();
+
+    // ── Roof rails ────────────────────────────────────────────────────────────
+    const rr1 = iso(wx+xARoof, yMRoof+0.025, wz-(W/2-ri-0.02)*facing, cx, cy, sc);
+    const rr2 = iso(wx+xCPillar, yCRoof+0.015, wz-(W/2-ri-0.02)*facing, cx, cy, sc);
+    ctx.beginPath(); ctx.moveTo(...rr1); ctx.lineTo(...rr2);
+    ctx.strokeStyle = 'rgba(90,90,100,.8)'; ctx.lineWidth = 1.4*dpr; ctx.stroke();
+
+    // ── Antenna (rear roof) ───────────────────────────────────────────────────
+    const antBase = iso(wx+xCPillar+0.04, yMRoof,      wz, cx, cy, sc);
+    const antTip  = iso(wx+xCPillar+0.04, yMRoof+0.12, wz, cx, cy, sc);
+    ctx.beginPath(); ctx.moveTo(...antBase); ctx.lineTo(...antTip);
+    ctx.strokeStyle = 'rgba(40,40,45,.9)'; ctx.lineWidth = 1.8*dpr; ctx.stroke();
+
+    // ── Charge port status glow ───────────────────────────────────────────────
+    const statusColor = window.EV_COLORS.getStatusColor(v.startPct, v.endPct);
+    const cpP = iso(wx + xFront - 0.06, yBody - 0.08, wz - (W/2)*facing, cx, cy, sc);
+    ctx.beginPath(); ctx.arc(cpP[0], cpP[1], 3.5*dpr, 0, Math.PI*2);
+    ctx.fillStyle = statusColor;
+    ctx.shadowColor = statusColor; ctx.shadowBlur = 9;
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    // ── SOC badge ─────────────────────────────────────────────────────────────
+    const topP = iso(wx, yMRoof + 0.22, wz, cx, cy, sc);
+    const pct  = Math.round(v.endPct);
+    const bw=28*dpr, bh=12*dpr;
+    ctx.fillStyle = 'rgba(0,0,0,.75)';
+    ctx.beginPath(); ctx.roundRect(topP[0]-bw/2, topP[1]-bh/2, bw, bh, 3); ctx.fill();
+    ctx.fillStyle = statusColor;
+    ctx.font = `600 ${Math.round(7.5*dpr)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(pct + '%', topP[0], topP[1]);
+
+    // ── Location label ────────────────────────────────────────────────────────
+    const lp = iso(wx, yMRoof + 0.38, wz, cx, cy, sc);
+    ctx.fillStyle = 'rgba(155,180,205,.65)';
+    ctx.font = `${Math.round(6.5*dpr)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(v.location || '', lp[0], lp[1]);
+
+    return { hx: topP[0], hy: topP[1], hr: 18*dpr };
   }
 
-  // ── Main draw ────────────────────────────────────────────────────────────────
-  let hitAreas = []; // [{vehicleIdx, hx, hy, hr}]
+  // ── Main draw ─────────────────────────────────────────────────────────────────
+  let hitAreas = [];
 
   function drawScene() {
     const W   = canvas.width, H = canvas.height;
@@ -388,30 +554,22 @@
     ctx.clearRect(0, 0, W, H);
     hitAreas = [];
 
-    if (!vehs.length) {
-      drawEmptyLot(W, H, dpr);
-      return;
-    }
+    if (!vehs.length) { drawEmptyLot(W, H, dpr); return; }
 
-    // Assign each vehicle to a lot slot based on its location string
     const assignments = assignVehicles(vehs);
 
-    // Scale to fit the full lot
     const lotW  = lotBounds.maxX - lotBounds.minX + CAR_W;
-    const lotDp = lotBounds.maxZ - lotBounds.minZ + CAR_D + LANE_W * 6; // extra for RL
-    const fitSc = Math.min(W * 0.92, H * 0.88) / Math.max(lotW, lotDp) * zoomLv * dpr;
-    const sc    = fitSc;
+    const lotDp = lotBounds.maxZ - lotBounds.minZ + CAR_D + LANE_W * 6;
+    const sc    = Math.min(W * 0.92, H * 0.88) / Math.max(lotW, lotDp) * zoomLv * dpr;
     const cx    = W * 0.5;
     const cy    = H * 0.44;
 
-    // Center offset — includes pan
     const offX = -(lotBounds.minX + lotW / 2) + panOffX;
     const offZ = -(lotBounds.minZ + lotDp / 2) + panOffZ;
 
     const P2 = (x, z) => iso(x + offX, 0, z + offZ, cx, cy, sc);
 
-    // ── Draw lot surface ──────────────────────────────────────────────────────
-    // Full asphalt base
+    // Asphalt base
     const corners = [
       P2(lotBounds.minX - 1, lotBounds.minZ - 1),
       P2(lotBounds.maxX + 1, lotBounds.minZ - 1),
@@ -424,17 +582,18 @@
 
     // Section labels and dividers
     SECTIONS.forEach((secName, secIdx) => {
-      const secW   = CARS_PER_ROW * (CAR_W + CAR_GAP);
-      const secX   = secIdx * (secW + SEC_GAP) + secW / 2;
-      const labelP = iso(secX + offX, 0.001, lotBounds.minZ - 2 + offZ, cx, cy, sc);
+      const carsThisSec = secName === '1T' ? CARS_1T : CARS_PER_ROW;
+      const secOffX     = getSectionOffX(secIdx);
+      const secW        = carsThisSec * (CAR_W + CAR_GAP);
+      const labelP      = iso(secOffX + secW / 2 + offX, 0.001, lotBounds.minZ - 2 + offZ, cx, cy, sc);
+
       ctx.fillStyle = 'rgba(255,255,255,.22)';
       ctx.font = `600 ${Math.round(9 * dpr)}px -apple-system,sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(secName, labelP[0], labelP[1]);
 
-      // Section divider line
       if (secIdx > 0) {
-        const divX = secIdx * (secW + SEC_GAP) - SEC_GAP / 2;
+        const divX = secOffX - SEC_GAP / 2;
         const la   = iso(divX + offX, 0.001, lotBounds.minZ + offZ, cx, cy, sc);
         const lb   = iso(divX + offX, 0.001, lotBounds.maxZ + LANE_W * 5 + offZ, cx, cy, sc);
         ctx.beginPath(); ctx.moveTo(...la); ctx.lineTo(...lb);
@@ -442,7 +601,7 @@
       }
     });
 
-    // ── Sort back-to-front (painter's algorithm) ──────────────────────────────
+    // Sort back-to-front (painter's algorithm)
     const selectedIdx = window.lot ? window.lot.getSelectedIdx() : -1;
     const hoveredIdx  = window.lot ? window.lot.getHoveredIdx()  : -1;
 
@@ -452,10 +611,9 @@
     })).sort((a, b) => b.depth - a.depth);
 
     for (const { slot, vehicle: v, vehicleIdx: vi } of sorted) {
-      const wx  = slot.wx + offX;
-      const wz  = slot.wz + offZ;
+      const wx = slot.wx + offX;
+      const wz = slot.wz + offZ;
 
-      // Spot highlight
       const sp = [
         iso(wx - CAR_W/2*.9, .001, wz - CAR_D/2*.9, cx,cy,sc),
         iso(wx + CAR_W/2*.9, .001, wz - CAR_D/2*.9, cx,cy,sc),
@@ -486,7 +644,6 @@
       hitAreas.push({ vehicleIdx: vi, ...hit });
     }
 
-    // Staging area label if any overflow
     const hasOverflow = sorted.some(a => a.slot.section === 'STAGING');
     if (hasOverflow) {
       const stagP = iso(offX, 0.001, lotBounds.maxZ + LANE_W * 3.5 + offZ, cx, cy, sc);
@@ -537,9 +694,8 @@
   window.addEventListener('resize', resize);
 
   // ── Interaction ───────────────────────────────────────────────────────────────
-  // Mode toggle button switches between Rotate and Pan
   function getPanSc() {
-    const dpr = window.devicePixelRatio||1;
+    const dpr  = window.devicePixelRatio||1;
     const lotW = lotBounds.maxX - lotBounds.minX;
     const lotD = lotBounds.maxZ - lotBounds.minZ;
     return Math.min(canvas.width * 0.92, canvas.height * 0.88) / Math.max(lotW, lotD) * zoomLv * dpr;
@@ -555,14 +711,10 @@
 
   canvas.addEventListener('mousedown', e => {
     if (isPanMode || e.button === 1) {
-      panActive = true;
-      panStartX = e.clientX;
-      panStartY = e.clientY;
+      panActive = true; panStartX = e.clientX; panStartY = e.clientY;
       canvas.style.cursor = 'move';
     } else {
-      dragActive    = true;
-      dragStartX    = e.clientX;
-      dragStartAngY = angY;
+      dragActive = true; dragStartX = e.clientX; dragStartAngY = angY;
       canvas.style.cursor = 'grabbing';
     }
   });
@@ -570,77 +722,72 @@
   window.addEventListener('mousemove', e => {
     if (panActive) {
       applyPanDelta(e.clientX - panStartX, e.clientY - panStartY);
-      panStartX = e.clientX;
-      panStartY = e.clientY;
-      return;
+      panStartX = e.clientX; panStartY = e.clientY; return;
     }
     if (dragActive) angY = dragStartAngY + (e.clientX - dragStartX) / 130;
 
-    // Hover
     const rect = canvas.getBoundingClientRect();
     const dpr  = window.devicePixelRatio||1;
     const mx   = (e.clientX-rect.left)*dpr, my=(e.clientY-rect.top)*dpr;
     let found  = -1;
-    for(const h of hitAreas){const dx=mx-h.hx,dy=my-h.hy;if(dx*dx+dy*dy<h.hr*h.hr*5){found=h.vehicleIdx;break;}}
-    const prev = window.lot?window.lot.getHoveredIdx():-1;
-    if(found!==prev){
-      if(window.lot) window.lot.setHoveredIdx(found);
-      canvas.style.cursor = found>=0?'pointer':(isPanMode?'move':(dragActive?'grabbing':'grab'));
+    for (const h of hitAreas) {
+      const dx=mx-h.hx, dy=my-h.hy;
+      if (dx*dx+dy*dy < h.hr*h.hr*5) { found=h.vehicleIdx; break; }
+    }
+    const prev = window.lot ? window.lot.getHoveredIdx() : -1;
+    if (found !== prev) {
+      if (window.lot) window.lot.setHoveredIdx(found);
+      canvas.style.cursor = found>=0 ? 'pointer' : (isPanMode?'move':(dragActive?'grabbing':'grab'));
     }
   });
 
   window.addEventListener('mouseup', e => {
-    if (panActive) {
-      panActive = false;
-      canvas.style.cursor = isPanMode ? 'move' : 'grab';
-      return;
-    }
+    if (panActive) { panActive=false; canvas.style.cursor=isPanMode?'move':'grab'; return; }
     if (!dragActive) return;
-    // Click detection (no significant drag)
-    if (Math.abs(e.clientX-dragStartX)<6) {
-      const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
-      const mx=(e.clientX-rect.left)*dpr,my=(e.clientY-rect.top)*dpr;
-      for(const h of hitAreas){const dx=mx-h.hx,dy=my-h.hy;if(dx*dx+dy*dy<h.hr*h.hr*8){if(window.lot)window.lot.selectVehicle(h.vehicleIdx);break;}}
+    if (Math.abs(e.clientX-dragStartX) < 6) {
+      const rect=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+      const mx=(e.clientX-rect.left)*dpr, my=(e.clientY-rect.top)*dpr;
+      for (const h of hitAreas) {
+        const dx=mx-h.hx, dy=my-h.hy;
+        if (dx*dx+dy*dy < h.hr*h.hr*8) { if(window.lot) window.lot.selectVehicle(h.vehicleIdx); break; }
+      }
     }
-    dragActive=false;
-    canvas.style.cursor = isPanMode?'move':'grab';
-    stopRot();
+    dragActive=false; canvas.style.cursor=isPanMode?'move':'grab'; stopRot();
   });
 
-  // Touch: one finger = current mode, two fingers = always pan
   let touchStartX=0, touch2StartX=0, touch2StartY=0, isPinch=false;
-  canvas.addEventListener('touchstart',e=>{
-    if(e.touches.length===2){
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length===2) {
       isPinch=true;
       touch2StartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
       touch2StartY=(e.touches[0].clientY+e.touches[1].clientY)/2;
     } else {
-      isPinch=false;
-      touchStartX=e.touches[0].clientX;
-      dragStartAngY=angY;
-      panStartX=e.touches[0].clientX;
-      panStartY=e.touches[0].clientY;
+      isPinch=false; touchStartX=e.touches[0].clientX; dragStartAngY=angY;
+      panStartX=e.touches[0].clientX; panStartY=e.touches[0].clientY;
     }
-  },{passive:true});
-  canvas.addEventListener('touchmove',e=>{
-    if(isPinch&&e.touches.length===2){
+  }, { passive:true });
+
+  canvas.addEventListener('touchmove', e => {
+    if (isPinch && e.touches.length===2) {
       const cx2=(e.touches[0].clientX+e.touches[1].clientX)/2;
       const cy2=(e.touches[0].clientY+e.touches[1].clientY)/2;
       applyPanDelta(cx2-touch2StartX, cy2-touch2StartY);
       touch2StartX=cx2; touch2StartY=cy2;
-    } else if(!isPinch) {
-      if(isPanMode){
+    } else if (!isPinch) {
+      if (isPanMode) {
         applyPanDelta(e.touches[0].clientX-panStartX, e.touches[0].clientY-panStartY);
         panStartX=e.touches[0].clientX; panStartY=e.touches[0].clientY;
       } else {
         angY=dragStartAngY+(e.touches[0].clientX-touchStartX)/130;
       }
     }
-  },{passive:true});
+  }, { passive:true });
 
-  canvas.addEventListener('wheel',e=>{e.preventDefault();zoomLv=Math.max(.2,Math.min(6,zoomLv-e.deltaY*.0006));},{passive:false});
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomLv = Math.max(.2, Math.min(6, zoomLv - e.deltaY * .0006));
+  }, { passive:false });
 
-  // Mode toggle button
   const modeToggleBtn = document.getElementById('mode-toggle');
   if (modeToggleBtn) {
     modeToggleBtn.addEventListener('click', () => {
@@ -651,29 +798,28 @@
     });
   }
 
-  function startRot(dir){stopRot();rotInterval=setInterval(()=>{angY+=dir*.04;},30);}
-  function stopRot(){if(rotInterval){clearInterval(rotInterval);rotInterval=null;}}
+  function startRot(dir) { stopRot(); rotInterval=setInterval(()=>{angY+=dir*.04;},30); }
+  function stopRot()      { if(rotInterval){clearInterval(rotInterval);rotInterval=null;} }
 
-  document.getElementById('rot-left').addEventListener('mousedown',()=>startRot(-1));
-  document.getElementById('rot-right').addEventListener('mousedown',()=>startRot(1));
-  document.getElementById('rot-left').addEventListener('touchstart',()=>startRot(-1),{passive:true});
-  document.getElementById('rot-right').addEventListener('touchstart',()=>startRot(1),{passive:true});
-  window.addEventListener('mouseup',stopRot);
-  window.addEventListener('touchend',stopRot);
+  document.getElementById('rot-left').addEventListener('mousedown',  ()=>startRot(-1));
+  document.getElementById('rot-right').addEventListener('mousedown', ()=>startRot(1));
+  document.getElementById('rot-left').addEventListener('touchstart',  ()=>startRot(-1), {passive:true});
+  document.getElementById('rot-right').addEventListener('touchstart', ()=>startRot(1),  {passive:true});
+  window.addEventListener('mouseup',  stopRot);
+  window.addEventListener('touchend', stopRot);
 
-  canvas.style.cursor='grab';
+  canvas.style.cursor = 'grab';
 
   // ── Public API ────────────────────────────────────────────────────────────────
   window.renderer = {
     resize,
-    start() { if(!raf){resize();loop();} },
+    start() { if (!raf) { resize(); loop(); } },
     redraw: drawScene,
   };
 
   window.lotZoom      = d => canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:d<0?-120:120,bubbles:true}));
   window.lotResetView = () => {
-    angY=0.3; zoomLv=1.0; panOffX=0; panOffZ=0;
-    isPanMode=false;
+    angY=0.3; zoomLv=1.0; panOffX=0; panOffZ=0; isPanMode=false;
     const btn=document.getElementById('mode-toggle');
     if(btn){btn.textContent='🔄 Rotate';btn.classList.remove('mode-toggle--active');}
     canvas.style.cursor='grab';
