@@ -97,7 +97,7 @@
   // ── Build RL row list from RL_ROWS constant ───────────────────────────────────
   // Pattern: RL-1, RL-2, [LANE], RL-3
   // RL_ROWS = ['RL-1','RL-2','RL-3'] — lane is inserted after every 2nd row
-  function buildRLRowList() {
+ function buildRLRowList() {
     const rows = [];
     let pairPos = 0;
     RL_ROWS.forEach(label => {
@@ -157,7 +157,7 @@
               section:  '1RL',
               rowLabel: rowEntry.label,
               carIdx:   c + 1,
-              spotId:   `1RL-${rowEntry.label}`,
+              spotId:   rowEntry.label,
               wx:       secOffX + c * (CAR_W + CAR_GAP),
               wz:       zOff,
               facing,
@@ -197,6 +197,8 @@
   function parseLocation(loc) {
     if (!loc) return null;
     let s = String(loc).trim().toUpperCase().replace(/\s+/g, '');
+    // RL locations stored as "RL-1", "RL-2", "RL-3" — pass through directly
+    if (/^RL-\d+$/.test(s)) return s;
     if (/^\d+T-\S+/.test(s) || /^\d+RL-\S+/.test(s)) return s;
     const noDash = s.match(/^(\d+T|1RL)(\S+)$/);
     if (noDash) return noDash[1] + '-' + noDash[2];
